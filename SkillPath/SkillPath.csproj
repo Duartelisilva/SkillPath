@@ -11,4 +11,13 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SkillPath.Application\SkillPath.Application.csproj" />
+    <ProjectReference Include="..\SkillPath.Infrastructure\SkillPath.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Controllers\" />
+  </ItemGroup>
+
 </Project>

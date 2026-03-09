@@ -3,9 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkillPath", "SkillPath\SkillPath.csproj", "{3DDF4D8A-2AE2-4795-A9D4-581C8E8E7B53}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SkillPath", "SkillPath\SkillPath.csproj", "{3DDF4D8A-2AE2-4795-A9D4-581C8E8E7B53}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkillPath.Domain", "SkillPath.Domain\SkillPath.Domain.csproj", "{D2471D78-4501-4E9C-9C3C-2B7B7B9E744D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SkillPath.Domain", "SkillPath.Domain\SkillPath.Domain.csproj", "{D2471D78-4501-4E9C-9C3C-2B7B7B9E744D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkillPath.Application", "SkillPath.Application\SkillPath.Application.csproj", "{4879277C-D502-495F-9BB5-002DDCF9837C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SkillPath.Infrastructure", "SkillPath.Infrastructure\SkillPath.Infrastructure.csproj", "{2A2858C1-CA28-41B4-96A2-1AD20CF6863B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +25,14 @@ Global
 		{D2471D78-4501-4E9C-9C3C-2B7B7B9E744D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D2471D78-4501-4E9C-9C3C-2B7B7B9E744D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D2471D78-4501-4E9C-9C3C-2B7B7B9E744D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4879277C-D502-495F-9BB5-002DDCF9837C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4879277C-D502-495F-9BB5-002DDCF9837C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4879277C-D502-495F-9BB5-002DDCF9837C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4879277C-D502-495F-9BB5-002DDCF9837C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2A2858C1-CA28-41B4-96A2-1AD20CF6863B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A2858C1-CA28-41B4-96A2-1AD20CF6863B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A2858C1-CA28-41B4-96A2-1AD20CF6863B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A2858C1-CA28-41B4-96A2-1AD20CF6863B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
