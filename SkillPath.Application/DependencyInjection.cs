@@ -5,6 +5,15 @@ using SkillPath.Application.Goals.Commands.DeleteGoal;
 using SkillPath.Application.Goals.Commands.UpdateGoal;
 using SkillPath.Application.Goals.Queries.GetGoalById;
 using SkillPath.Application.Goals.Queries.ListGoals;
+using SkillPath.Application.Skills.Commands.CreateSkill;
+using SkillPath.Application.Skills.Commands.DeleteSkill;
+using SkillPath.Application.Skills.Commands.UpdateSkill;
+using SkillPath.Application.Skills.Queries.GetSkillById;
+using SkillPath.Application.Skills.Queries.GetSkillsByGoal;
+using SkillPath.Application.Tasks.Commands.CreateTask;
+using SkillPath.Application.Tasks.Commands.DeleteTask;
+using SkillPath.Application.Tasks.Commands.UpdateTask;
+using SkillPath.Application.Tasks.Queries.GetTasksBySkill;
 
 namespace SkillPath.Application;
 
@@ -12,11 +21,25 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        // Goals
         services.AddScoped<CreateGoalHandler>();
         services.AddScoped<UpdateGoalHandler>();
         services.AddScoped<DeleteGoalHandler>();
         services.AddScoped<GetGoalByIdHandler>();
         services.AddScoped<ListGoalsHandler>();
+
+        // Skills
+        services.AddScoped<CreateSkillHandler>();
+        services.AddScoped<UpdateSkillHandler>();
+        services.AddScoped<DeleteSkillHandler>();
+        services.AddScoped<GetSkillByIdHandler>();
+        services.AddScoped<GetSkillsByGoalHandler>();
+
+        // Tasks
+        services.AddScoped<CreateTaskHandler>();
+        services.AddScoped<UpdateTaskHandler>();
+        services.AddScoped<DeleteTaskHandler>();
+        services.AddScoped<GetTasksBySkillHandler>();
 
         return services;
     }

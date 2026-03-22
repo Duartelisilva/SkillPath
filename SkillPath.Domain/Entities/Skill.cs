@@ -126,4 +126,18 @@ public sealed class Skill : BaseEntity
         UpdatedAtUtc = DateTime.UtcNow;
         return task;
     }
+
+    public void RemoveTask(Guid taskId)
+    {
+        if (Status == SkillStatus.Completed)
+            throw new DomainException("Cannot remove tasks from a completed skill.");
+
+        var task = _tasks.FirstOrDefault(t => t.Id == taskId);
+
+        if (task is null)
+            throw new DomainException("Task not found in this skill.");
+
+        _tasks.Remove(task);
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
 }

@@ -118,4 +118,18 @@ public sealed class Goal : BaseEntity
         UpdatedAtUtc = DateTime.UtcNow;
         return skill;
     }
+
+    public void RemoveSkill(Guid skillId)
+    {
+        if (Status == GoalStatus.Archived)
+            throw new DomainException("Cannot remove skills from an archived goal.");
+
+        var skill = _skills.FirstOrDefault(s => s.Id == skillId);
+
+        if (skill is null)
+            throw new DomainException("Skill not found in this goal.");
+
+        _skills.Remove(skill);
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
 }
