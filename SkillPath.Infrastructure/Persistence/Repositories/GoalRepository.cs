@@ -14,10 +14,22 @@ public sealed class GoalRepository : IGoalRepository
         _dbContext = dbContext;
     }
 
-    public async Task AddAsync(Goal goal, CancellationToken cancellationToken)
+    public Task AddAsync(Goal goal, CancellationToken cancellationToken)
     {
-        await _dbContext.Goals.AddAsync(goal, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        _dbContext.Goals.Add(goal);
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAsync(Goal goal, CancellationToken cancellationToken)
+    {
+        _dbContext.Goals.Update(goal);
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(Goal goal, CancellationToken cancellationToken)
+    {
+        _dbContext.Goals.Remove(goal);
+        return Task.CompletedTask;
     }
 
     public async Task<Goal?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
@@ -31,17 +43,5 @@ public sealed class GoalRepository : IGoalRepository
         return await _dbContext.Goals
             .OrderBy(goal => goal.CreatedAtUtc)
             .ToListAsync(cancellationToken);
-    }
-
-    public async Task UpdateAsync(Goal goal, CancellationToken cancellationToken)
-    {
-        _dbContext.Goals.Update(goal);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task DeleteAsync(Goal goal, CancellationToken cancellationToken)
-    {
-        _dbContext.Goals.Remove(goal);
-        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }

@@ -28,5 +28,11 @@ public sealed class GoalConfiguration : IEntityTypeConfiguration<Goal>
             .IsRequired();
 
         builder.Property(goal => goal.UpdatedAtUtc);
+
+        builder.HasMany(g => g.Skills)
+            .WithOne()
+            .HasForeignKey(s => s.GoalId)
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

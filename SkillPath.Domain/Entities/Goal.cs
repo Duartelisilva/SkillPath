@@ -12,6 +12,8 @@ public sealed class Goal : BaseEntity
     public GoalStatus Status { get; private set; } = GoalStatus.Draft;
     public DateTime CreatedAtUtc { get; private set; } = DateTime.UtcNow;
     public DateTime? UpdatedAtUtc { get; private set; }
+    private readonly List<Skill> _skills = new();
+    public IReadOnlyCollection<Skill> Skills => _skills.AsReadOnly();
 
     private Goal()
     {
@@ -104,5 +106,16 @@ public sealed class Goal : BaseEntity
         }
 
         Description = description.Trim();
+    }
+
+    public Skill AddSkill(string name, string description, int order)
+    {
+        if (Status == GoalStatus.Archived)
+            throw new DomainException("Cannot add skills to an archived goal.");
+
+        var skill = new Skill(Id, name, description, order);
+        _skills.Add(skill);
+        UpdatedAtUtc = DateTime.UtcNow;
+        return skill;
     }
 }

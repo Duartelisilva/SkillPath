@@ -8,10 +8,12 @@ namespace SkillPath.Application.Goals.Commands.CreateGoal;
 public sealed class CreateGoalHandler
 {
     private readonly IGoalRepository _goalRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public CreateGoalHandler(IGoalRepository goalRepository)
+    public CreateGoalHandler(IGoalRepository goalRepository, IUnitOfWork unitOfWork)
     {
         _goalRepository = goalRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<GoalDto> HandleAsync(CreateGoalCommand command, CancellationToken cancellationToken)
@@ -19,6 +21,7 @@ public sealed class CreateGoalHandler
         var goal = new Goal(command.Title, command.Description);
 
         await _goalRepository.AddAsync(goal, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken); // commit once at the end
 
         return GoalDto.FromEntity(goal);
     }
