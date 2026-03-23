@@ -1,35 +1,33 @@
 ﻿// Handles the creation of a new task within a skill.
 using SkillPath.Application.Abstractions.Persistence;
 using SkillPath.Application.Tasks.Dtos;
+using SkillPath.Domain.Entities;
 
 namespace SkillPath.Application.Tasks.Commands.CreateTask;
 
 public sealed class CreateTaskHandler
 {
-    private readonly IGoalRepository _goalRepository;
+    private readonly ISkillRepository _skillRepository;
+    private readonly ILearningTaskRepository _taskRepository;
     private readonly IUnitOfWork _unitOfWork;
 
-    public CreateTaskHandler(IGoalRepository goalRepository, IUnitOfWork unitOfWork)
+    public CreateTaskHandler(ISkillRepository skillRepository, ILearningTaskRepository taskRepository, IUnitOfWork unitOfWork)
     {
-        _goalRepository = goalRepository;
+        _skillRepository = skillRepository;
+        _taskRepository = taskRepository;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<LearningTaskDto?> HandleAsync(CreateTaskCommand command, CancellationToken cancellationToken)
     {
-        var goal = await _goalRepository.GetByIdAsync(command.GoalId, cancellationToken);
+        var skill = await _skillRepository.GetByIdAsync(command.SkillId, cancellationToken);
 
-        if (goal is null)
+        if (skill is null || skill.GoalId != command.GoalId)
             return null;
 
-        var skill = goal.Skills.FirstOrDefault(s => s.Id == command.SkillId);
+        var task = new LearningTask(command.SkillId, command.Title, command.Description, command.Order);
 
-        if (skill is null)
-            return null;
-
-        var task = skill.AddTask(command.Title, command.Description, command.Order);
-
-        await _goalRepository.UpdateAsync(goal, cancellationToken);
+        await _taskRepository.AddAsync(task, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return LearningTaskDto.FromEntity(task);

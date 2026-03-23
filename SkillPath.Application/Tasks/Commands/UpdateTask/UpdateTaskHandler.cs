@@ -6,35 +6,30 @@ namespace SkillPath.Application.Tasks.Commands.UpdateTask;
 
 public sealed class UpdateTaskHandler
 {
-    private readonly IGoalRepository _goalRepository;
+    private readonly ILearningTaskRepository _taskRepository;
+    private readonly ISkillRepository _skillRepository;
     private readonly IUnitOfWork _unitOfWork;
 
-    public UpdateTaskHandler(IGoalRepository goalRepository, IUnitOfWork unitOfWork)
+    public UpdateTaskHandler(ILearningTaskRepository taskRepository, ISkillRepository skillRepository, IUnitOfWork unitOfWork)
     {
-        _goalRepository = goalRepository;
+        _taskRepository = taskRepository;
+        _skillRepository = skillRepository;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<LearningTaskDto?> HandleAsync(UpdateTaskCommand command, CancellationToken cancellationToken)
     {
-        var goal = await _goalRepository.GetByIdAsync(command.GoalId, cancellationToken);
+        var skill = await _skillRepository.GetByIdAsync(command.SkillId, cancellationToken);
 
-        if (goal is null)
+        if (skill is null || skill.GoalId != command.GoalId)
             return null;
 
-        var skill = goal.Skills.FirstOrDefault(s => s.Id == command.SkillId);
+        var task = await _taskRepository.GetByIdAsync(command.TaskId, cancellationToken);
 
-        if (skill is null)
-            return null;
-
-        var task = skill.Tasks.FirstOrDefault(t => t.Id == command.TaskId);
-
-        if (task is null)
+        if (task is null || task.SkillId != command.SkillId)
             return null;
 
         task.UpdateDetails(command.Title, command.Description);
-
-        await _goalRepository.UpdateAsync(goal, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return LearningTaskDto.FromEntity(task);

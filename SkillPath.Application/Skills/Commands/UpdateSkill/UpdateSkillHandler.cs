@@ -6,30 +6,23 @@ namespace SkillPath.Application.Skills.Commands.UpdateSkill;
 
 public sealed class UpdateSkillHandler
 {
-    private readonly IGoalRepository _goalRepository;
+    private readonly ISkillRepository _skillRepository;
     private readonly IUnitOfWork _unitOfWork;
 
-    public UpdateSkillHandler(IGoalRepository goalRepository, IUnitOfWork unitOfWork)
+    public UpdateSkillHandler(ISkillRepository skillRepository, IUnitOfWork unitOfWork)
     {
-        _goalRepository = goalRepository;
+        _skillRepository = skillRepository;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<SkillDto?> HandleAsync(UpdateSkillCommand command, CancellationToken cancellationToken)
     {
-        var goal = await _goalRepository.GetByIdAsync(command.GoalId, cancellationToken);
+        var skill = await _skillRepository.GetByIdAsync(command.SkillId, cancellationToken);
 
-        if (goal is null)
-            return null;
-
-        var skill = goal.Skills.FirstOrDefault(s => s.Id == command.SkillId);
-
-        if (skill is null)
+        if (skill is null || skill.GoalId != command.GoalId)
             return null;
 
         skill.UpdateDetails(command.Name, command.Description);
-
-        await _goalRepository.UpdateAsync(goal, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return SkillDto.FromEntity(skill);

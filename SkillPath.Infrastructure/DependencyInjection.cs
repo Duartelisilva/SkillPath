@@ -16,8 +16,9 @@ public static class DependencyInjection
             options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
 
         services.AddScoped<IGoalRepository, GoalRepository>();
-        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>()); // add this
-
+        services.AddScoped<ISkillRepository, SkillRepository>();
+        services.AddScoped<ILearningTaskRepository, LearningTaskRepository>();
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
         return services;
     }
 }

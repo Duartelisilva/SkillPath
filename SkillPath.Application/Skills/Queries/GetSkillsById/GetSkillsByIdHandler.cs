@@ -6,22 +6,20 @@ namespace SkillPath.Application.Skills.Queries.GetSkillById;
 
 public sealed class GetSkillByIdHandler
 {
-    private readonly IGoalRepository _goalRepository;
+    private readonly ISkillRepository _skillRepository;
 
-    public GetSkillByIdHandler(IGoalRepository goalRepository)
+    public GetSkillByIdHandler(ISkillRepository skillRepository)
     {
-        _goalRepository = goalRepository;
+        _skillRepository = skillRepository;
     }
 
     public async Task<SkillDto?> HandleAsync(GetSkillByIdQuery query, CancellationToken cancellationToken)
     {
-        var goal = await _goalRepository.GetByIdAsync(query.GoalId, cancellationToken);
+        var skill = await _skillRepository.GetByIdAsync(query.SkillId, cancellationToken);
 
-        if (goal is null)
+        if (skill is null || skill.GoalId != query.GoalId)
             return null;
 
-        var skill = goal.Skills.FirstOrDefault(s => s.Id == query.SkillId);
-
-        return skill is null ? null : SkillDto.FromEntity(skill);
+        return SkillDto.FromEntity(skill);
     }
 }

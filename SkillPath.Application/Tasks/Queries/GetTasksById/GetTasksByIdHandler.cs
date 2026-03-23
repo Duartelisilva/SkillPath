@@ -6,27 +6,27 @@ namespace SkillPath.Application.Tasks.Queries.GetTaskById;
 
 public sealed class GetTaskByIdHandler
 {
-    private readonly IGoalRepository _goalRepository;
+    private readonly ILearningTaskRepository _taskRepository;
+    private readonly ISkillRepository _skillRepository;
 
-    public GetTaskByIdHandler(IGoalRepository goalRepository)
+    public GetTaskByIdHandler(ILearningTaskRepository taskRepository, ISkillRepository skillRepository)
     {
-        _goalRepository = goalRepository;
+        _taskRepository = taskRepository;
+        _skillRepository = skillRepository;
     }
 
     public async Task<LearningTaskDto?> HandleAsync(GetTaskByIdQuery query, CancellationToken cancellationToken)
     {
-        var goal = await _goalRepository.GetByIdAsync(query.GoalId, cancellationToken);
+        var skill = await _skillRepository.GetByIdAsync(query.SkillId, cancellationToken);
 
-        if (goal is null)
+        if (skill is null || skill.GoalId != query.GoalId)
             return null;
 
-        var skill = goal.Skills.FirstOrDefault(s => s.Id == query.SkillId);
+        var task = await _taskRepository.GetByIdAsync(query.TaskId, cancellationToken);
 
-        if (skill is null)
+        if (task is null || task.SkillId != query.SkillId)
             return null;
 
-        var task = skill.Tasks.FirstOrDefault(t => t.Id == query.TaskId);
-
-        return task is null ? null : LearningTaskDto.FromEntity(task);
+        return LearningTaskDto.FromEntity(task);
     }
 }

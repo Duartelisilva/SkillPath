@@ -1,34 +1,34 @@
-﻿// Handles deletion of a task from a skill.
+﻿// Handles deletion of a task.
 using SkillPath.Application.Abstractions.Persistence;
 
 namespace SkillPath.Application.Tasks.Commands.DeleteTask;
 
 public sealed class DeleteTaskHandler
 {
-    private readonly IGoalRepository _goalRepository;
+    private readonly ILearningTaskRepository _taskRepository;
+    private readonly ISkillRepository _skillRepository;
     private readonly IUnitOfWork _unitOfWork;
 
-    public DeleteTaskHandler(IGoalRepository goalRepository, IUnitOfWork unitOfWork)
+    public DeleteTaskHandler(ILearningTaskRepository taskRepository, ISkillRepository skillRepository, IUnitOfWork unitOfWork)
     {
-        _goalRepository = goalRepository;
+        _taskRepository = taskRepository;
+        _skillRepository = skillRepository;
         _unitOfWork = unitOfWork;
     }
 
     public async Task<bool> HandleAsync(DeleteTaskCommand command, CancellationToken cancellationToken)
     {
-        var goal = await _goalRepository.GetByIdAsync(command.GoalId, cancellationToken);
+        var skill = await _skillRepository.GetByIdAsync(command.SkillId, cancellationToken);
 
-        if (goal is null)
+        if (skill is null || skill.GoalId != command.GoalId)
             return false;
 
-        var skill = goal.Skills.FirstOrDefault(s => s.Id == command.SkillId);
+        var task = await _taskRepository.GetByIdAsync(command.TaskId, cancellationToken);
 
-        if (skill is null)
+        if (task is null || task.SkillId != command.SkillId)
             return false;
 
-        skill.RemoveTask(command.TaskId);
-
-        await _goalRepository.UpdateAsync(goal, cancellationToken);
+        await _taskRepository.DeleteAsync(task, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         return true;

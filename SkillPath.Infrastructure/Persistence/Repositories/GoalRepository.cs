@@ -22,7 +22,6 @@ public sealed class GoalRepository : IGoalRepository
 
     public Task UpdateAsync(Goal goal, CancellationToken cancellationToken)
     {
-        _dbContext.Goals.Update(goal);
         return Task.CompletedTask;
     }
 
@@ -35,12 +34,16 @@ public sealed class GoalRepository : IGoalRepository
     public async Task<Goal?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
         return await _dbContext.Goals
+            .Include(g => g.Skills)
+                .ThenInclude(s => s.Tasks)
             .FirstOrDefaultAsync(goal => goal.Id == id, cancellationToken);
     }
 
     public async Task<IReadOnlyCollection<Goal>> ListAsync(CancellationToken cancellationToken)
     {
         return await _dbContext.Goals
+            .Include(g => g.Skills)
+                .ThenInclude(s => s.Tasks)
             .OrderBy(goal => goal.CreatedAtUtc)
             .ToListAsync(cancellationToken);
     }

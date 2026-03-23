@@ -7,10 +7,12 @@ namespace SkillPath.Application.Skills.Queries.ListSkillsByGoal;
 public sealed class ListSkillsByGoalHandler
 {
     private readonly IGoalRepository _goalRepository;
+    private readonly ISkillRepository _skillRepository;
 
-    public ListSkillsByGoalHandler(IGoalRepository goalRepository)
+    public ListSkillsByGoalHandler(IGoalRepository goalRepository, ISkillRepository skillRepository)
     {
         _goalRepository = goalRepository;
+        _skillRepository = skillRepository;
     }
 
     public async Task<IReadOnlyCollection<SkillDto>?> HandleAsync(ListSkillsByGoalQuery query, CancellationToken cancellationToken)
@@ -20,8 +22,9 @@ public sealed class ListSkillsByGoalHandler
         if (goal is null)
             return null;
 
-        return goal.Skills
-            .OrderBy(s => s.Order)
+        var skills = await _skillRepository.ListByGoalAsync(query.GoalId, cancellationToken);
+
+        return skills
             .Select(SkillDto.FromEntity)
             .ToArray();
     }

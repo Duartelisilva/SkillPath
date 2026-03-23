@@ -6,27 +6,25 @@ namespace SkillPath.Application.Tasks.Queries.ListTasksBySkill;
 
 public sealed class ListTasksBySkillHandler
 {
-    private readonly IGoalRepository _goalRepository;
+    private readonly ISkillRepository _skillRepository;
+    private readonly ILearningTaskRepository _taskRepository;
 
-    public ListTasksBySkillHandler(IGoalRepository goalRepository)
+    public ListTasksBySkillHandler(ISkillRepository skillRepository, ILearningTaskRepository taskRepository)
     {
-        _goalRepository = goalRepository;
+        _skillRepository = skillRepository;
+        _taskRepository = taskRepository;
     }
 
     public async Task<IReadOnlyCollection<LearningTaskDto>?> HandleAsync(ListTasksBySkillQuery query, CancellationToken cancellationToken)
     {
-        var goal = await _goalRepository.GetByIdAsync(query.GoalId, cancellationToken);
+        var skill = await _skillRepository.GetByIdAsync(query.SkillId, cancellationToken);
 
-        if (goal is null)
+        if (skill is null || skill.GoalId != query.GoalId)
             return null;
 
-        var skill = goal.Skills.FirstOrDefault(s => s.Id == query.SkillId);
+        var tasks = await _taskRepository.ListBySkillAsync(query.SkillId, cancellationToken);
 
-        if (skill is null)
-            return null;
-
-        return skill.Tasks
-            .OrderBy(t => t.Order)
+        return tasks
             .Select(LearningTaskDto.FromEntity)
             .ToArray();
     }
