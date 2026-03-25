@@ -1,4 +1,5 @@
 // Configures the HTTP pipeline and dependency injection for the API.
+using SkillPath.API.Middleware;
 using SkillPath.Application;
 using SkillPath.Infrastructure;
 
@@ -18,7 +19,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-
+app.UseExceptionHandling();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();

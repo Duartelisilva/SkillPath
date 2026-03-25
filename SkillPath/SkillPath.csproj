@@ -20,9 +20,4 @@
     <ProjectReference Include="..\SkillPath.Infrastructure\SkillPath.Infrastructure.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Middleware\" />
-    <Folder Include="Middleware\" />
-  </ItemGroup>
-
 </Project>
