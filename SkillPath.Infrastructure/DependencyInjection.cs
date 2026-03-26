@@ -2,7 +2,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using SkillPath.Application.Abstractions.AI;
 using SkillPath.Application.Abstractions.Persistence;
+using SkillPath.Infrastructure.AI;
 using SkillPath.Infrastructure.Persistence;
 using SkillPath.Infrastructure.Persistence.Repositories;
 
@@ -19,6 +21,12 @@ public static class DependencyInjection
         services.AddScoped<ISkillRepository, SkillRepository>();
         services.AddScoped<ILearningTaskRepository, LearningTaskRepository>();
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<AppDbContext>());
+
+        services.AddHttpClient<ISkillTreeGenerator, OllamaSkillTreeGenerator>(client =>
+        {
+            client.BaseAddress = new Uri("http://localhost:11434");
+            client.Timeout = TimeSpan.FromMinutes(2); // local models can be slow
+        });
         return services;
     }
 }

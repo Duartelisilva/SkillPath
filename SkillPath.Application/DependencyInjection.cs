@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using SkillPath.Application.Goals.Commands.CreateGoal;
 using SkillPath.Application.Goals.Commands.DeleteGoal;
+using SkillPath.Application.Goals.Commands.GenerateSkillTree;
 using SkillPath.Application.Goals.Commands.UpdateGoal;
 using SkillPath.Application.Goals.Queries.GetGoalById;
 using SkillPath.Application.Goals.Queries.ListGoals;
@@ -42,7 +43,7 @@ public static class DependencyInjection
         services.AddScoped<DeleteTaskHandler>();
         services.AddScoped<GetTaskByIdHandler>();
         services.AddScoped<ListTasksBySkillHandler>();
-
+        services.AddScoped<GenerateSkillTreeHandler>();
         return services;
     }
 }

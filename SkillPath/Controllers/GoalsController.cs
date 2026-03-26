@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SkillPath.API.Contracts.Goals;
 using SkillPath.Application.Goals.Commands.CreateGoal;
 using SkillPath.Application.Goals.Commands.DeleteGoal;
+using SkillPath.Application.Goals.Commands.GenerateSkillTree;
 using SkillPath.Application.Goals.Commands.UpdateGoal;
 using SkillPath.Application.Goals.Queries.GetGoalById;
 using SkillPath.Application.Goals.Queries.ListGoals;
@@ -78,5 +79,22 @@ public sealed class GoalsController : ControllerBase
         var deleted = await handler.HandleAsync(new DeleteGoalCommand { Id = id }, cancellationToken);
 
         return deleted ? NoContent() : NotFound();
+    }
+
+    [HttpPost("{id:guid}/generate-skill-tree")]
+    public async Task<IActionResult> GenerateSkillTree(
+    Guid id,
+    [FromBody] GenerateSkillTreeRequest request,
+    [FromServices] GenerateSkillTreeHandler handler,
+    CancellationToken cancellationToken)
+    {
+        var command = new GenerateSkillTreeCommand
+        {
+            GoalId = id,
+            AdditionalContext = request.AdditionalContext
+        };
+
+        var result = await handler.HandleAsync(command, cancellationToken);
+        return Ok(result);
     }
 }
