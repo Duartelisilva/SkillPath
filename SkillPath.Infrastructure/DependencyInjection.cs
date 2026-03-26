@@ -27,6 +27,13 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("http://localhost:11434");
             client.Timeout = TimeSpan.FromMinutes(2); // local models can be slow
         });
+
+        services.AddHttpClient<ITaskGenerator, OllamaTaskGenerator>(client =>
+        {
+            client.BaseAddress = new Uri("http://localhost:11434");
+            client.Timeout = TimeSpan.FromMinutes(2);
+        });
+
         return services;
     }
 }
