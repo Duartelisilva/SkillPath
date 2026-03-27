@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -299,7 +299,8 @@ export class GoalsComponent implements OnInit {
   newTitle = '';
   newDescription = '';
 
-  constructor(private api: ApiService, private router: Router) {}
+  private api = inject(ApiService);
+  private router = inject(Router);
 
   ngOnInit() {
     this.api.getGoals().subscribe({

@@ -6,4 +6,4 @@ import { Component } from '@angular/core';
   templateUrl: './skill-tree.html',
   styles: ``,
 })
-export class SkillTree {}
+export class SkillTreeComponent {}
