@@ -15,6 +15,9 @@ import cytoscape from 'cytoscape';
       <header class="page-header">
         <button class="btn btn-secondary back-btn" (click)="goBack()">← Back</button>
         <h1 class="page-title">Skill Tree</h1>
+        <div class="zoom-controls">
+          <button class="btn btn-secondary zoom-btn" (click)="resetZoom()">Reset View</button>
+        </div>
       </header>
 
       <div class="layout" *ngIf="!loading()">
@@ -27,7 +30,7 @@ import cytoscape from 'cytoscape';
               <span class="skill-status-dot {{ selectedSkill()!.status }}"></span>
               <h2>{{ selectedSkill()!.name }}</h2>
             </div>
-            <button class="close-btn" (click)="selectedSkill.set(null)">✕</button>
+            <button class="close-btn" (click)="closePanel()">✕</button>
           </div>
 
           <p class="skill-desc" *ngIf="selectedSkill()">{{ selectedSkill()!.description }}</p>
@@ -49,7 +52,7 @@ import cytoscape from 'cytoscape';
                   <p class="task-desc">{{ task.description }}</p>
                 </div>
               </div>
-              <div *ngIf="tasks().length === 0" class="no-tasks">No tasks yet.</div>
+              <div *ngIf="tasks().length === 0" class="no-tasks">No tasks generated for this skill yet.</div>
             </div>
           </div>
         </div>
@@ -82,10 +85,21 @@ import cytoscape from 'cytoscape';
       background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      flex: 1;
+    }
+
+    .zoom-controls {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .zoom-btn {
+      padding: 0.5rem 1rem;
     }
 
     .layout {
       display: flex;
+      position: relative;
       flex: 1;
       overflow: hidden;
       height: calc(100vh - 80px);
@@ -97,20 +111,31 @@ import cytoscape from 'cytoscape';
     }
 
     .task-panel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      height: 100%;
+
       width: 0;
       overflow: hidden;
+
       background: var(--bg-card);
       border-left: 1px solid var(--border-accent);
+
       transition: width 0.3s ease;
+
       display: flex;
       flex-direction: column;
       overflow-y: auto;
 
-      &.open {
-        width: 380px;
-        padding: 1.5rem;
-      }
+      z-index: 10; /* sits above graph */
     }
+
+    .task-panel.open {
+      width: 400px;
+      padding: 1.5rem;
+    }
+
 
     .panel-header {
       display: flex;
@@ -150,6 +175,7 @@ import cytoscape from 'cytoscape';
       cursor: pointer;
       padding: 0.25rem;
       line-height: 1;
+      transition: color 0.2s;
 
       &:hover { color: var(--text-primary); }
     }
@@ -198,22 +224,27 @@ import cytoscape from 'cytoscape';
     }
 
     .task-check {
-      font-size: 1.1rem;
+      font-size: 1.2rem;
       padding-top: 0.1rem;
       flex-shrink: 0;
       cursor: pointer;
       transition: transform 0.2s ease;
+      user-select: none;
 
       &:hover {
-        transform: scale(1.2);
+        transform: scale(1.3);
+      }
+
+      &:active {
+        transform: scale(1.1);
       }
 
       .check-icon, .progress-icon, .empty-icon {
         display: inline-block;
-        width: 20px;
-        height: 20px;
+        width: 22px;
+        height: 22px;
         text-align: center;
-        line-height: 20px;
+        line-height: 22px;
       }
     }
 
@@ -234,6 +265,7 @@ import cytoscape from 'cytoscape';
       color: var(--text-muted);
       text-align: center;
       padding: 2rem 0;
+      font-size: 0.9rem;
     }
 
     .mini-spinner {
@@ -296,6 +328,19 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     this.router.navigate(['/goals']);
   }
 
+  closePanel() {
+    this.selectedSkill.set(null);
+    if (this.cy) {
+      this.cy.elements().unselect();
+    }
+  }
+
+  resetZoom() {
+    if (this.cy) {
+      this.cy.fit(undefined, 50); // Fit with 50px padding
+    }
+  }
+
   loadSkillTree() {
     this.api.getSkills(this.goalId).subscribe({
       next: skills => {
@@ -332,6 +377,9 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
       });
     });
 
+    console.log('Initializing Cytoscape with:', { nodes: nodes.length, edges: edges.length });
+    console.log('Skills with dependencies:', skills.filter(s => s.dependsOn && s.dependsOn.length > 0));
+
     this.cy = cytoscape({
       container: this.cyContainer.nativeElement,
       elements: { nodes, edges },
@@ -342,55 +390,72 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
             'background-color': (ele: any) => statusColors[ele.data('status')] ?? '#374151',
             'label': 'data(label)',
             'color': '#f1f5f9',
-            'font-size': '13px',
+            'font-size': '15px',
+            'font-weight': '600',
             'font-family': 'Inter, sans-serif',
             'text-valign': 'center',
             'text-halign': 'center',
             'text-wrap': 'wrap',
-            'text-max-width': '120px',
-            'width': 140,
-            'height': 60,
+            'text-max-width': '160px',
+            'width': 180,
+            'height': 80,
             'shape': 'roundrectangle',
-            'border-width': 2,
+            'border-width': 3,
             'border-color': (ele: any) => statusColors[ele.data('status')] ?? '#374151',
-            'border-opacity': 0.8,
+            'border-opacity': 0.9,
+            'padding': '12px',
           } as any
         },
         {
           selector: 'node:selected',
           style: {
             'border-color': '#7c3aed',
-            'border-width': 3,
-            'box-shadow': '0 0 15px rgba(124,58,237,0.6)',
+            'border-width': 4,
+            'box-shadow': '0 0 20px rgba(124,58,237,0.8)',
           } as any
         },
         {
           selector: 'edge',
           style: {
-            'width': 2,
-            'line-color': '#2d3f5e',
-            'target-arrow-color': '#2d3f5e',
+            'width': 3,
+            'line-color': '#4b5563',
+            'target-arrow-color': '#4b5563',
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
+            'arrow-scale': 1.5,
           } as any
         }
       ],
       layout: {
         name: 'breadthfirst',
         directed: true,
-        padding: 60,
-        spacingFactor: 1.75,
+        padding: 80,
+        spacingFactor: 2.0,
+        avoidOverlap: true,
       },
+      minZoom: 0.3,
+      maxZoom: 2.0,
+      wheelSensitivity: 2,
       userZoomingEnabled: true,
       userPanningEnabled: true,
       autoungrabify: true,
       boxSelectionEnabled: false,
     });
 
+    // Fit the view initially with padding
+    this.cy.fit(undefined, 50);
+
     this.cy.on('tap', 'node', (evt: any) => {
       const skill: Skill = evt.target.data('skill');
       this.selectedSkill.set(skill);
       this.loadTasks(skill);
+    });
+
+    // Deselect when clicking on background
+    this.cy.on('tap', (evt: any) => {
+      if (evt.target === this.cy) {
+        this.closePanel();
+      }
     });
   }
 
@@ -399,10 +464,14 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     this.tasks.set([]);
     this.api.getTasks(this.goalId, skill.id).subscribe({
       next: tasks => {
+        console.log(`Loaded ${tasks.length} tasks for skill ${skill.name}`);
         this.tasks.set(tasks);
         this.tasksLoading.set(false);
       },
-      error: () => this.tasksLoading.set(false)
+      error: (err) => {
+        console.error('Error loading tasks:', err);
+        this.tasksLoading.set(false);
+      }
     });
   }
 
@@ -416,15 +485,24 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
       task.status === 'InProgress' ? 'Completed' :
       'NotStarted';
 
+    console.log(`Updating task ${task.id} from ${task.status} to ${nextStatus}`);
+
     this.api.updateTaskStatus(this.goalId, currentSkill.id, task.id, nextStatus).subscribe({
       next: updatedTask => {
+        console.log('Task updated successfully:', updatedTask);
+        
         // Update the task in the list
         this.tasks.update(tasks => 
           tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
         );
 
         // Reload the skill tree to reflect any auto-unlocked skills or completed skills
-        this.loadSkillTree();
+        setTimeout(() => {
+          this.loadSkillTree();
+        }, 300);
+      },
+      error: (err) => {
+        console.error('Error updating task status:', err);
       }
     });
   }

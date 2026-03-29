@@ -24,12 +24,13 @@ public sealed class OllamaSkillTreeGenerator : ISkillTreeGenerator
             ? $"The user already has these skills: {string.Join(", ", existingSkillNames)}. Do not include them."
             : string.Empty;
 
-        var prompt = $"""
+        // Note: Using $$$ for raw string literal to allow JSON braces in the example
+        var prompt = $$$"""
             You are a learning path expert. Generate a structured skill tree for the following goal.
 
-            Goal: {goalTitle}
-            Description: {goalDescription}
-            {existingSkillsSection}
+            Goal: {{{goalTitle}}}
+            Description: {{{goalDescription}}}
+            {{{existingSkillsSection}}}
 
             Create a logical progression of skills where later skills build upon earlier ones.
             Each skill can depend on one or more previous skills (using their order numbers).
@@ -47,6 +48,13 @@ public sealed class OllamaSkillTreeGenerator : ISkillTreeGenerator
             - Skills can only depend on skills with lower order numbers
             - Most skills should depend on 1-2 previous skills to create a clear learning path
             - Skills at the same level can share dependencies
+
+            Example structure:
+            [
+              {"name": "Basics", "description": "Foundation", "order": 0, "dependsOn": []},
+              {"name": "Intermediate", "description": "Build on basics", "order": 1, "dependsOn": [0]},
+              {"name": "Advanced", "description": "Combine skills", "order": 2, "dependsOn": [0, 1]}
+            ]
 
             Return ONLY the JSON array.
             """;
