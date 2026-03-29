@@ -313,7 +313,7 @@ export class GoalsComponent implements OnInit {
   }
 
   getSkillCount(goal: Goal): number {
-    return 0; // will come from API later
+    return goal.skillCount ?? 0;
   }
 
   openGoal(goal: Goal) {

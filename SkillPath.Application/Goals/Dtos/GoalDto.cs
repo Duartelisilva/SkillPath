@@ -9,19 +9,18 @@ public sealed class GoalDto
     public string Title { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
+    public int SkillCount { get; init; }
     public DateTime CreatedAtUtc { get; init; }
     public DateTime? UpdatedAtUtc { get; init; }
 
-    public static GoalDto FromEntity(Goal goal)
+    public static GoalDto FromEntity(Goal goal) => new()
     {
-        return new GoalDto
-        {
-            Id = goal.Id,
-            Title = goal.Title,
-            Description = goal.Description,
-            Status = goal.Status.ToString(),
-            CreatedAtUtc = goal.CreatedAtUtc,
-            UpdatedAtUtc = goal.UpdatedAtUtc
-        };
-    }
+        Id = goal.Id,
+        Title = goal.Title,
+        Description = goal.Description,
+        Status = goal.Status.ToString(),
+        SkillCount = goal.Skills.Count,
+        CreatedAtUtc = goal.CreatedAtUtc,
+        UpdatedAtUtc = goal.UpdatedAtUtc
+    };
 }
