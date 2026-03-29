@@ -72,6 +72,23 @@ import { Goal } from '../../models/goal.model';
           </div>
         </div>
       </div>
+
+      <!-- Generation Progress Modal -->
+      <div class="modal-overlay" *ngIf="generating()" (click)="$event.stopPropagation()">
+        <div class="modal progress-modal" (click)="$event.stopPropagation()">
+          <div class="progress-content">
+            <div class="progress-spinner">
+              <div class="spinner-large"></div>
+            </div>
+            <h2>Generating Skill Tree</h2>
+            <p class="progress-message">{{ progressMessage() }}</p>
+            <div class="progress-bar">
+              <div class="progress-fill" [style.width.%]="progressPercent()"></div>
+            </div>
+            <p class="progress-hint">This may take 1-2 minutes on CPU. Please wait...</p>
+          </div>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
@@ -251,6 +268,57 @@ import { Goal } from '../../models/goal.model';
       }
     }
 
+    .progress-modal {
+      max-width: 520px;
+    }
+
+    .progress-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .progress-spinner {
+      margin-bottom: 0.5rem;
+    }
+
+    .spinner-large {
+      width: 64px;
+      height: 64px;
+      border: 4px solid var(--border-accent);
+      border-top-color: var(--accent-purple);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    .progress-message {
+      color: var(--text-primary);
+      font-size: 1.1rem;
+      text-align: center;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: var(--bg-secondary);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan));
+      transition: width 0.5s ease;
+      border-radius: 4px;
+    }
+
+    .progress-hint {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
     .form-group {
       display: flex;
       flex-direction: column;
@@ -295,12 +363,15 @@ export class GoalsComponent implements OnInit {
   goals = signal<Goal[]>([]);
   loading = signal(true);
   generating = signal<string | null>(null);
+  progressMessage = signal('Initializing AI model...');
+  progressPercent = signal(0);
   showModal = false;
   newTitle = '';
   newDescription = '';
 
   private api = inject(ApiService);
   private router = inject(Router);
+  private progressInterval: any;
 
   ngOnInit() {
     this.api.getGoals().subscribe({
@@ -310,6 +381,12 @@ export class GoalsComponent implements OnInit {
       },
       error: () => this.loading.set(false)
     });
+  }
+
+  ngOnDestroy() {
+    if (this.progressInterval) {
+      clearInterval(this.progressInterval);
+    }
   }
 
   getSkillCount(goal: Goal): number {
@@ -336,13 +413,57 @@ export class GoalsComponent implements OnInit {
   generateTree(event: Event, goal: Goal) {
     event.stopPropagation();
     this.generating.set(goal.id);
+    this.startProgressSimulation();
 
     this.api.generateSkillTree(goal.id).subscribe({
       next: () => {
+        this.stopProgressSimulation();
         this.generating.set(null);
         this.router.navigate(['/goals', goal.id, 'skill-tree']);
       },
-      error: () => this.generating.set(null)
+      error: () => {
+        this.stopProgressSimulation();
+        this.generating.set(null);
+      }
     });
+  }
+
+  private startProgressSimulation() {
+    const messages = [
+      'Initializing AI model...',
+      'Analyzing your learning goal...',
+      'Generating skill progression...',
+      'Creating learning tasks...',
+      'Building skill dependencies...',
+      'Finalizing skill tree...'
+    ];
+
+    let messageIndex = 0;
+    let currentProgress = 0;
+
+    this.progressMessage.set(messages[0]);
+    this.progressPercent.set(0);
+
+    this.progressInterval = setInterval(() => {
+      // Increment progress (slower as it approaches 95%)
+      const increment = currentProgress < 50 ? 3 : currentProgress < 80 ? 1.5 : 0.5;
+      currentProgress = Math.min(95, currentProgress + increment);
+      this.progressPercent.set(currentProgress);
+
+      // Update message based on progress
+      const newMessageIndex = Math.floor((currentProgress / 95) * messages.length);
+      if (newMessageIndex !== messageIndex && newMessageIndex < messages.length) {
+        messageIndex = newMessageIndex;
+        this.progressMessage.set(messages[messageIndex]);
+      }
+    }, 800);
+  }
+
+  private stopProgressSimulation() {
+    if (this.progressInterval) {
+      clearInterval(this.progressInterval);
+    }
+    this.progressPercent.set(100);
+    this.progressMessage.set('Complete!');
   }
 }

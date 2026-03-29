@@ -39,10 +39,10 @@ import cytoscape from 'cytoscape';
             </div>
             <div class="task-list" *ngIf="!tasksLoading()">
               <div class="task-item {{ task.status }}" *ngFor="let task of tasks()">
-                <div class="task-check">
-                  <span *ngIf="task.status === 'Completed'">✓</span>
-                  <span *ngIf="task.status === 'InProgress'">◎</span>
-                  <span *ngIf="task.status === 'NotStarted'">○</span>
+                <div class="task-check" (click)="toggleTaskStatus(task)">
+                  <span *ngIf="task.status === 'Completed'" class="check-icon">✓</span>
+                  <span *ngIf="task.status === 'InProgress'" class="progress-icon">◎</span>
+                  <span *ngIf="task.status === 'NotStarted'" class="empty-icon">○</span>
                 </div>
                 <div class="task-content">
                   <p class="task-title">{{ task.title }}</p>
@@ -178,6 +178,11 @@ import cytoscape from 'cytoscape';
       margin-bottom: 0.5rem;
       border: 1px solid var(--border-accent);
       background: var(--bg-secondary);
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: var(--accent-purple);
+      }
 
       &.Completed {
         border-color: rgba(16, 185, 129, 0.3);
@@ -196,6 +201,20 @@ import cytoscape from 'cytoscape';
       font-size: 1.1rem;
       padding-top: 0.1rem;
       flex-shrink: 0;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+
+      &:hover {
+        transform: scale(1.2);
+      }
+
+      .check-icon, .progress-icon, .empty-icon {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        text-align: center;
+        line-height: 20px;
+      }
     }
 
     .task-title {
@@ -364,7 +383,7 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
       },
       userZoomingEnabled: true,
       userPanningEnabled: true,
-      autoungrabify: true,   // <-- disables node dragging
+      autoungrabify: true,
       boxSelectionEnabled: false,
     });
 
@@ -384,6 +403,29 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
         this.tasksLoading.set(false);
       },
       error: () => this.tasksLoading.set(false)
+    });
+  }
+
+  toggleTaskStatus(task: LearningTask) {
+    const currentSkill = this.selectedSkill();
+    if (!currentSkill) return;
+
+    // Cycle through: NotStarted -> InProgress -> Completed -> NotStarted
+    const nextStatus = 
+      task.status === 'NotStarted' ? 'InProgress' :
+      task.status === 'InProgress' ? 'Completed' :
+      'NotStarted';
+
+    this.api.updateTaskStatus(this.goalId, currentSkill.id, task.id, nextStatus).subscribe({
+      next: updatedTask => {
+        // Update the task in the list
+        this.tasks.update(tasks => 
+          tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
+        );
+
+        // Reload the skill tree to reflect any auto-unlocked skills or completed skills
+        this.loadSkillTree();
+      }
     });
   }
 }

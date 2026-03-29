@@ -14,6 +14,7 @@ using SkillPath.Application.Skills.Queries.ListSkillsByGoal;
 using SkillPath.Application.Tasks.Commands.CreateTask;
 using SkillPath.Application.Tasks.Commands.DeleteTask;
 using SkillPath.Application.Tasks.Commands.UpdateTask;
+using SkillPath.Application.Tasks.Commands.UpdateTaskStatus;
 using SkillPath.Application.Tasks.Queries.GetTaskById;
 using SkillPath.Application.Tasks.Queries.ListTasksBySkill;
 
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<DeleteGoalHandler>();
         services.AddScoped<GetGoalByIdHandler>();
         services.AddScoped<ListGoalsHandler>();
+        services.AddScoped<GenerateSkillTreeHandler>();
 
         // Skills
         services.AddScoped<CreateSkillHandler>();
@@ -43,7 +45,8 @@ public static class DependencyInjection
         services.AddScoped<DeleteTaskHandler>();
         services.AddScoped<GetTaskByIdHandler>();
         services.AddScoped<ListTasksBySkillHandler>();
-        services.AddScoped<GenerateSkillTreeHandler>();
+        services.AddScoped<UpdateTaskStatusHandler>();
+
         return services;
     }
 }

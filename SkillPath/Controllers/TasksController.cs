@@ -4,6 +4,7 @@ using SkillPath.API.Contracts.Tasks;
 using SkillPath.Application.Tasks.Commands.CreateTask;
 using SkillPath.Application.Tasks.Commands.DeleteTask;
 using SkillPath.Application.Tasks.Commands.UpdateTask;
+using SkillPath.Application.Tasks.Commands.UpdateTaskStatus;
 using SkillPath.Application.Tasks.Queries.GetTaskById;
 using SkillPath.Application.Tasks.Queries.ListTasksBySkill;
 
@@ -79,6 +80,28 @@ public sealed class TasksController : ControllerBase
             TaskId = taskId,
             Title = request.Title,
             Description = request.Description
+        };
+
+        var result = await handler.HandleAsync(command, cancellationToken);
+
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    [HttpPatch("{taskId:guid}/status")]
+    public async Task<IActionResult> UpdateStatus(
+        Guid goalId,
+        Guid skillId,
+        Guid taskId,
+        [FromBody] UpdateTaskStatusRequest request,
+        [FromServices] UpdateTaskStatusHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var command = new UpdateTaskStatusCommand
+        {
+            GoalId = goalId,
+            SkillId = skillId,
+            TaskId = taskId,
+            Status = request.Status
         };
 
         var result = await handler.HandleAsync(command, cancellationToken);

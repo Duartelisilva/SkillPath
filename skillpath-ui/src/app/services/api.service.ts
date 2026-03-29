@@ -36,4 +36,8 @@ export class ApiService {
   updateTask(goalId: string, skillId: string, taskId: string, title: string, description: string): Observable<LearningTask> {
     return this.http.put<LearningTask>(`${this.base}/goals/${goalId}/skills/${skillId}/tasks/${taskId}`, { title, description });
   }
+
+  updateTaskStatus(goalId: string, skillId: string, taskId: string, status: string): Observable<LearningTask> {
+    return this.http.patch<LearningTask>(`${this.base}/goals/${goalId}/skills/${skillId}/tasks/${taskId}/status`, { status });
+  }
 }

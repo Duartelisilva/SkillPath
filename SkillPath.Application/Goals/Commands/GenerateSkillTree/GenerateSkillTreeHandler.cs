@@ -1,4 +1,4 @@
-﻿// Handles AI-powered skill tree generation for a goal.
+﻿// Handles AI-powered skill tree generation for a goal with dependency mapping.
 using SkillPath.Application.Abstractions.AI;
 using SkillPath.Application.Abstractions.Persistence;
 using SkillPath.Application.Skills.Dtos;
@@ -58,14 +58,35 @@ public sealed class GenerateSkillTreeHandler
             existingSkills.Select(s => s.Name).ToArray(),
             cancellationToken);
 
-        // Persist skills and generate tasks for each
+        // First pass: Create all skills
+        var skillMap = new Dictionary<int, Skill>(); // order -> skill
         var newSkills = new List<Skill>();
+
         foreach (var gen in generatedSkills)
         {
             var skill = new Skill(goal.Id, gen.Name, gen.Description, gen.Order);
             await _skillRepository.AddAsync(skill, cancellationToken);
+            skillMap[gen.Order] = skill;
+            newSkills.Add(skill);
+        }
 
-            // Generate tasks for this skill
+        // Save to get IDs assigned
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Second pass: Map dependencies using order numbers
+        // Parse the dependencies from the AI response by re-calling with a modified interface
+        // For now, we'll create a simple sequential dependency chain
+        // TODO: Enhance to parse actual dependency data from AI
+        for (int i = 1; i < newSkills.Count; i++)
+        {
+            var currentSkill = newSkills[i];
+            var previousSkill = newSkills[i - 1];
+            currentSkill.AddDependency(previousSkill.Id);
+        }
+
+        // Third pass: Generate tasks for each skill
+        foreach (var skill in newSkills)
+        {
             var generatedTasks = await _taskGenerator.GenerateAsync(
                 skill.Name,
                 skill.Description,
@@ -77,8 +98,12 @@ public sealed class GenerateSkillTreeHandler
                 var task = new LearningTask(skill.Id, genTask.Title, genTask.Description, genTask.Order);
                 await _taskRepository.AddAsync(task, cancellationToken);
             }
+        }
 
-            newSkills.Add(skill);
+        // Unlock the first skill (no dependencies)
+        if (newSkills.Count > 0)
+        {
+            newSkills[0].Unlock();
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
