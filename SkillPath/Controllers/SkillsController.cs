@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using SkillPath.API.Contracts.Skills;
 using SkillPath.Application.Skills.Commands.CreateSkill;
 using SkillPath.Application.Skills.Commands.DeleteSkill;
+using SkillPath.Application.Skills.Commands.RegenerateTasks;
 using SkillPath.Application.Skills.Commands.UpdateSkill;
 using SkillPath.Application.Skills.Queries.GetSkillById;
 using SkillPath.Application.Skills.Queries.ListSkillsByGoal;
@@ -90,5 +91,23 @@ public sealed class SkillsController : ControllerBase
         var deleted = await handler.HandleAsync(new DeleteSkillCommand { GoalId = goalId, SkillId = skillId }, cancellationToken);
 
         return deleted ? NoContent() : NotFound();
+    }
+
+    [HttpPost("{skillId:guid}/regenerate-tasks")]
+    public async Task<IActionResult> RegenerateTasks(
+        Guid goalId,
+        Guid skillId,
+        [FromServices] RegenerateTasksForSkillHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var command = new RegenerateTasksForSkillCommand
+        {
+            GoalId = goalId,
+            SkillId = skillId
+        };
+
+        var result = await handler.HandleAsync(command, cancellationToken);
+
+        return result is null ? NotFound() : Ok(result);
     }
 }

@@ -36,13 +36,23 @@ import cytoscape from 'cytoscape';
           <p class="skill-desc" *ngIf="selectedSkill()">{{ selectedSkill()!.description }}</p>
 
           <div class="tasks-section" *ngIf="selectedSkill()">
-            <h3>Tasks</h3>
+            <div class="tasks-header">
+              <h3>Tasks</h3>
+              <button class="btn-regenerate" 
+                      (click)="regenerateTasks()" 
+                      [disabled]="regeneratingTasks() || selectedSkill()?.status === 'Locked' || selectedSkill()?.status === 'Completed'"
+                      title="Regenerate tasks for this skill">
+                {{ regeneratingTasks() ? '⚙ Regenerating...' : '🔄 Regenerate' }}
+              </button>
+            </div>
             <div *ngIf="tasksLoading()" class="tasks-loading">
               <div class="mini-spinner"></div>
             </div>
             <div class="task-list" *ngIf="!tasksLoading()">
               <div class="task-item {{ task.status }}" *ngFor="let task of tasks()">
-                <div class="task-check" (click)="toggleTaskStatus(task)">
+                <div class="task-check" 
+                     (click)="toggleTaskStatus(task)"
+                     [class.disabled]="!canToggleTask(task)">
                   <span *ngIf="task.status === 'Completed'" class="check-icon">✓</span>
                   <span *ngIf="task.status === 'InProgress'" class="progress-icon">◎</span>
                   <span *ngIf="task.status === 'NotStarted'" class="empty-icon">○</span>
@@ -52,7 +62,7 @@ import cytoscape from 'cytoscape';
                   <p class="task-desc">{{ task.description }}</p>
                 </div>
               </div>
-              <div *ngIf="tasks().length === 0" class="no-tasks">No tasks generated for this skill yet.</div>
+              <div *ngIf="tasks().length === 0" class="no-tasks">No tasks generated for this skill.</div>
             </div>
           </div>
         </div>
@@ -115,27 +125,21 @@ import cytoscape from 'cytoscape';
       top: 0;
       right: 0;
       height: 100%;
-
       width: 0;
       overflow: hidden;
-
       background: var(--bg-card);
       border-left: 1px solid var(--border-accent);
-
       transition: width 0.3s ease;
-
       display: flex;
       flex-direction: column;
       overflow-y: auto;
-
-      z-index: 10; /* sits above graph */
+      z-index: 10;
     }
 
     .task-panel.open {
       width: 400px;
       padding: 1.5rem;
     }
-
 
     .panel-header {
       display: flex;
@@ -187,13 +191,41 @@ import cytoscape from 'cytoscape';
       margin-bottom: 1.5rem;
     }
 
-    .tasks-section h3 {
-      font-size: 1.1rem;
-      color: var(--text-secondary);
+    .tasks-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
       margin-bottom: 1rem;
+    }
+
+    .tasks-section h3 {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      font-size: 0.85rem;
+      margin: 0;
+    }
+
+    .btn-regenerate {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-accent);
+      color: var(--text-primary);
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover:not(:disabled) {
+        border-color: var(--accent-purple);
+        background: var(--bg-card-hover);
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
     }
 
     .task-item {
@@ -231,12 +263,17 @@ import cytoscape from 'cytoscape';
       transition: transform 0.2s ease;
       user-select: none;
 
-      &:hover {
+      &:hover:not(.disabled) {
         transform: scale(1.3);
       }
 
-      &:active {
+      &:active:not(.disabled) {
         transform: scale(1.1);
+      }
+
+      &.disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
       }
 
       .check-icon, .progress-icon, .empty-icon {
@@ -311,9 +348,11 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
   selectedSkill = signal<Skill | null>(null);
   tasks = signal<LearningTask[]>([]);
   tasksLoading = signal(false);
+  regeneratingTasks = signal(false);
 
   private cy: any = null;
   private goalId = '';
+  private allSkills: Skill[] = [];
 
   ngOnInit() {
     this.goalId = this.route.snapshot.paramMap.get('goalId') ?? '';
@@ -337,13 +376,32 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
 
   resetZoom() {
     if (this.cy) {
-      this.cy.fit(undefined, 50); // Fit with 50px padding
+      this.cy.fit(undefined, 50);
     }
+  }
+
+  /**
+   * NEW: Check if a task can be toggled
+   * Returns false if:
+   * - Skill is locked
+   * - Skill is completed (can't change tasks of completed skills)
+   */
+  canToggleTask(task: LearningTask): boolean {
+    const skill = this.selectedSkill();
+    if (!skill) return false;
+
+    // Can't toggle tasks if skill is locked or completed
+    if (skill.status === 'Locked' || task.status === 'Completed') {
+      return false;
+    }
+
+    return true;
   }
 
   loadSkillTree() {
     this.api.getSkills(this.goalId).subscribe({
       next: skills => {
+        this.allSkills = skills;
         this.loading.set(false);
         setTimeout(() => this.initCytoscape(skills), 50);
       },
@@ -352,6 +410,11 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
   }
 
   initCytoscape(skills: Skill[]) {
+    if (this.cy) {
+      this.cy.destroy();
+      this.cy = null;
+    }
+
     if (!this.cyContainer) return;
 
     const statusColors: Record<string, string> = {
@@ -376,9 +439,6 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
         edges.push({ data: { source: depId, target: s.id } });
       });
     });
-
-    console.log('Initializing Cytoscape with:', { nodes: nodes.length, edges: edges.length });
-    console.log('Skills with dependencies:', skills.filter(s => s.dependsOn && s.dependsOn.length > 0));
 
     this.cy = cytoscape({
       container: this.cyContainer.nativeElement,
@@ -435,23 +495,24 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
       },
       minZoom: 0.3,
       maxZoom: 2.0,
-      wheelSensitivity: 2,
+      wheelSensitivity: 3,
       userZoomingEnabled: true,
       userPanningEnabled: true,
       autoungrabify: true,
       boxSelectionEnabled: false,
     });
 
-    // Fit the view initially with padding
     this.cy.fit(undefined, 50);
 
     this.cy.on('tap', 'node', (evt: any) => {
       const skill: Skill = evt.target.data('skill');
+      
+
+
       this.selectedSkill.set(skill);
       this.loadTasks(skill);
     });
 
-    // Deselect when clicking on background
     this.cy.on('tap', (evt: any) => {
       if (evt.target === this.cy) {
         this.closePanel();
@@ -479,30 +540,60 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     const currentSkill = this.selectedSkill();
     if (!currentSkill) return;
 
-    // Cycle through: NotStarted -> InProgress -> Completed -> NotStarted
-    const nextStatus = 
-      task.status === 'NotStarted' ? 'InProgress' :
-      task.status === 'InProgress' ? 'Completed' :
-      'NotStarted';
+    // NEW: Check if task can be toggled
+    if (!this.canToggleTask(task)) {
+      console.log('Cannot toggle task - skill is locked or completed');
+      return;
+    }
 
-    console.log(`Updating task ${task.id} from ${task.status} to ${nextStatus}`);
+    let nextStatus: string | null = null;
+
+    if (task.status === 'NotStarted') {
+      nextStatus = 'InProgress';
+    }
+    else if (task.status === 'InProgress') {
+      nextStatus = 'Completed';
+    }
+    else if (task.status === 'Completed') {
+      nextStatus = null; // Cannot go backwards
+    }
+
+    // Stop if no valid next step
+    if (!nextStatus) return;
+
 
     this.api.updateTaskStatus(this.goalId, currentSkill.id, task.id, nextStatus).subscribe({
       next: updatedTask => {
-        console.log('Task updated successfully:', updatedTask);
-        
-        // Update the task in the list
         this.tasks.update(tasks => 
           tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
         );
 
-        // Reload the skill tree to reflect any auto-unlocked skills or completed skills
         setTimeout(() => {
           this.loadSkillTree();
         }, 300);
       },
       error: (err) => {
         console.error('Error updating task status:', err);
+      }
+    });
+  }
+
+  regenerateTasks() {
+    const skill = this.selectedSkill();
+    if (!skill) return;
+
+    this.regeneratingTasks.set(true);
+    
+    // Call a new API endpoint to regenerate tasks for this specific skill
+    this.api.regenerateTasksForSkill(this.goalId, skill.id).subscribe({
+      next: (newTasks) => {
+        console.log(`Regenerated ${newTasks.length} tasks for ${skill.name}`);
+        this.tasks.set(newTasks);
+        this.regeneratingTasks.set(false);
+      },
+      error: (err) => {
+        console.error('Error regenerating tasks:', err);
+        this.regeneratingTasks.set(false);
       }
     });
   }

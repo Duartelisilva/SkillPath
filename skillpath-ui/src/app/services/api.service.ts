@@ -40,4 +40,8 @@ export class ApiService {
   updateTaskStatus(goalId: string, skillId: string, taskId: string, status: string): Observable<LearningTask> {
     return this.http.patch<LearningTask>(`${this.base}/goals/${goalId}/skills/${skillId}/tasks/${taskId}/status`, { status });
   }
+
+  regenerateTasksForSkill(goalId: string, skillId: string): Observable<LearningTask[]> {
+    return this.http.post<LearningTask[]>(`${this.base}/goals/${goalId}/skills/${skillId}/regenerate-tasks`, {});
+  }
 }

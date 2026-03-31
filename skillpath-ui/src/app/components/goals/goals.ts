@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -80,12 +80,27 @@ import { Goal } from '../../models/goal.model';
             <div class="progress-spinner">
               <div class="spinner-large"></div>
             </div>
-            <h2>Generating Skill Tree</h2>
+            <h2>{{ progressTitle() }}</h2>
             <p class="progress-message">{{ progressMessage() }}</p>
             <div class="progress-bar">
               <div class="progress-fill" [style.width.%]="progressPercent()"></div>
             </div>
-            <p class="progress-hint">This may take 1-2 minutes on CPU. Please wait...</p>
+            <p class="progress-hint">This may take 1-2 minutes. Please wait...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Error Modal -->
+      <div class="modal-overlay" *ngIf="showErrorModal()" (click)="showErrorModal.set(false)">
+        <div class="modal error-modal" (click)="$event.stopPropagation()">
+          <div class="error-icon">⚠️</div>
+          <h2>Generation Failed</h2>
+          <p class="error-message">{{ errorMessage() }}</p>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" (click)="showErrorModal.set(false)">Cancel</button>
+            <button class="btn btn-primary" (click)="retryGeneration()">
+              🔄 Try Again
+            </button>
           </div>
         </div>
       </div>
@@ -265,10 +280,11 @@ import { Goal } from '../../models/goal.model';
         background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+        margin: 0;
       }
     }
 
-    .progress-modal {
+    .progress-modal, .error-modal {
       max-width: 520px;
     }
 
@@ -296,6 +312,7 @@ import { Goal } from '../../models/goal.model';
       color: var(--text-primary);
       font-size: 1.1rem;
       text-align: center;
+      margin: 0;
     }
 
     .progress-bar {
@@ -317,6 +334,23 @@ import { Goal } from '../../models/goal.model';
       color: var(--text-muted);
       font-size: 0.85rem;
       text-align: center;
+      margin: 0;
+    }
+
+    .error-modal {
+      text-align: center;
+    }
+
+    .error-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+
+    .error-message {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      line-height: 1.6;
+      margin: 0;
     }
 
     .form-group {
@@ -359,21 +393,35 @@ import { Goal } from '../../models/goal.model';
     }
   `]
 })
-export class GoalsComponent implements OnInit {
+export class GoalsComponent implements OnInit, OnDestroy {
   goals = signal<Goal[]>([]);
   loading = signal(true);
   generating = signal<string | null>(null);
+  progressTitle = signal('Generating Skill Tree');
   progressMessage = signal('Initializing AI model...');
   progressPercent = signal(0);
   showModal = false;
+  showErrorModal = signal(false);
+  errorMessage = signal('');
   newTitle = '';
   newDescription = '';
 
   private api = inject(ApiService);
   private router = inject(Router);
   private progressInterval: any;
+  private currentGoalId: string | null = null;
 
   ngOnInit() {
+    this.loadGoals();
+  }
+
+  ngOnDestroy() {
+    if (this.progressInterval) {
+      clearInterval(this.progressInterval);
+    }
+  }
+
+  loadGoals() {
     this.api.getGoals().subscribe({
       next: goals => {
         this.goals.set(goals);
@@ -381,12 +429,6 @@ export class GoalsComponent implements OnInit {
       },
       error: () => this.loading.set(false)
     });
-  }
-
-  ngOnDestroy() {
-    if (this.progressInterval) {
-      clearInterval(this.progressInterval);
-    }
   }
 
   getSkillCount(goal: Goal): number {
@@ -412,20 +454,48 @@ export class GoalsComponent implements OnInit {
 
   generateTree(event: Event, goal: Goal) {
     event.stopPropagation();
+    this.currentGoalId = goal.id;
     this.generating.set(goal.id);
+    this.progressTitle.set('Generating Skill Tree');
     this.startProgressSimulation();
 
     this.api.generateSkillTree(goal.id).subscribe({
       next: () => {
         this.stopProgressSimulation();
         this.generating.set(null);
+        this.currentGoalId = null;
         this.router.navigate(['/goals', goal.id, 'skill-tree']);
       },
-      error: () => {
+      error: (err) => {
         this.stopProgressSimulation();
         this.generating.set(null);
+        this.handleGenerationError(err);
       }
     });
+  }
+
+  retryGeneration() {
+    this.showErrorModal.set(false);
+    if (this.currentGoalId) {
+      const goal = this.goals().find(g => g.id === this.currentGoalId);
+      if (goal) {
+        // Simulate a click event
+        this.generateTree(new Event('click'), goal);
+      }
+    }
+  }
+
+  private handleGenerationError(error: any) {
+    console.error('Generation error:', error);
+    
+    let message = 'The AI failed to generate a valid skill tree. This can happen when:';
+    message += '\n\n• The AI response was malformed';
+    message += '\n• The connection to Ollama was interrupted';
+    message += '\n• The model generated invalid JSON';
+    message += '\n\nWould you like to try again?';
+
+    this.errorMessage.set(message);
+    this.showErrorModal.set(true);
   }
 
   private startProgressSimulation() {
@@ -445,12 +515,10 @@ export class GoalsComponent implements OnInit {
     this.progressPercent.set(0);
 
     this.progressInterval = setInterval(() => {
-      // Increment progress (slower as it approaches 95%)
       const increment = currentProgress < 50 ? 3 : currentProgress < 80 ? 1.5 : 0.5;
       currentProgress = Math.min(95, currentProgress + increment);
       this.progressPercent.set(currentProgress);
 
-      // Update message based on progress
       const newMessageIndex = Math.floor((currentProgress / 95) * messages.length);
       if (newMessageIndex !== messageIndex && newMessageIndex < messages.length) {
         messageIndex = newMessageIndex;

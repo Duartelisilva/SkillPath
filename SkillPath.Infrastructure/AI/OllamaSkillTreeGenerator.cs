@@ -1,17 +1,21 @@
-﻿// Implements skill tree generation using a local Ollama instance with dependency mapping.
+﻿// Implements skill tree generation using a local Ollama instance with robust error handling.
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using SkillPath.Application.Abstractions.AI;
+using Microsoft.Extensions.Logging;
 
 namespace SkillPath.Infrastructure.AI;
 
 public sealed class OllamaSkillTreeGenerator : ISkillTreeGenerator
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<OllamaSkillTreeGenerator> _logger;
 
-    public OllamaSkillTreeGenerator(HttpClient httpClient)
+    public OllamaSkillTreeGenerator(HttpClient httpClient, ILogger<OllamaSkillTreeGenerator> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     public async Task<IReadOnlyCollection<GeneratedSkill>> GenerateAsync(
@@ -24,7 +28,6 @@ public sealed class OllamaSkillTreeGenerator : ISkillTreeGenerator
             ? $"The user already has these skills: {string.Join(", ", existingSkillNames)}. Do not include them."
             : string.Empty;
 
-        // Note: Using $$$ for raw string literal to allow JSON braces in the example
         var prompt = $$$"""
             You are a learning path expert. Generate a structured skill tree for the following goal.
 
@@ -33,86 +36,171 @@ public sealed class OllamaSkillTreeGenerator : ISkillTreeGenerator
             {{{existingSkillsSection}}}
 
             Create a logical progression of skills where later skills build upon earlier ones.
-            Each skill can depend on one or more previous skills (using their order numbers).
 
-            Respond ONLY with a valid JSON array. No explanation, no markdown, no code blocks.
+            CRITICAL: Respond ONLY with a valid JSON array. No explanation, no markdown, no code blocks, no extra text.
+            
             Each item must have exactly these fields:
             - "name": short skill name (max 200 chars)
             - "description": what this skill covers (max 1000 chars)
             - "order": integer starting from 0, representing learning sequence
-            - "dependsOn": array of order numbers this skill requires (e.g., [0, 1] means it depends on skills 0 and 1). First skill should have empty array [].
 
-            IMPORTANT:
-            - Generate between 5 and 8 skills maximum (CPU performance)
-            - First skill (order 0) must have "dependsOn": []
-            - Skills can only depend on skills with lower order numbers
-            - Most skills should depend on 1-2 previous skills to create a clear learning path
-            - Skills at the same level can share dependencies
+            IMPORTANT RULES:
+            - Generate exactly 5-7 skills (optimal for learning and performance)
+            - First skill (order 0) should be foundational/basic
+            - Skills should progress from beginner to advanced
+            - Each skill should be clear and actionable
+            - Use simple, direct language
 
-            Example structure:
+            Return ONLY the JSON array. Example format:
             [
-              {"name": "Basics", "description": "Foundation", "order": 0, "dependsOn": []},
-              {"name": "Intermediate", "description": "Build on basics", "order": 1, "dependsOn": [0]},
-              {"name": "Advanced", "description": "Combine skills", "order": 2, "dependsOn": [0, 1]}
+              {"name": "Basics", "description": "Foundation concepts", "order": 0},
+              {"name": "Intermediate", "description": "Build on basics", "order": 1}
             ]
 
-            Return ONLY the JSON array.
+            RESPOND WITH ONLY THE JSON ARRAY NOW:
             """;
 
-        var payload = new
+        try
         {
-            model = "mistral",
-            prompt,
-            stream = false
-        };
+            var payload = new
+            {
+                model = "mistral",
+                prompt,
+                stream = false,
+                options = new
+                {
+                    temperature = 0.7,
+                    top_p = 0.9
+                }
+            };
 
-        var json = JsonSerializer.Serialize(payload);
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-        var response = await _httpClient.PostAsync("/api/generate", content, cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new InvalidOperationException($"Ollama returned {(int)response.StatusCode}: {errorBody}");
+            _logger.LogInformation("Sending request to Ollama for goal: {Goal}", goalTitle);
+
+            var response = await _httpClient.PostAsync("/api/generate", content, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError("Ollama returned error {StatusCode}: {Error}", response.StatusCode, errorBody);
+                throw new InvalidOperationException($"Ollama returned {(int)response.StatusCode}: {errorBody}");
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogDebug("Raw Ollama response: {Response}", responseJson);
+
+            var ollamaResponse = JsonSerializer.Deserialize<OllamaResponse>(responseJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            var rawText = ollamaResponse?.Response ?? throw new InvalidOperationException("Empty response from Ollama.");
+
+            _logger.LogInformation("Received AI response, length: {Length}", rawText.Length);
+
+            // Clean and validate the response
+            var cleanedJson = CleanJsonResponse(rawText);
+            
+            _logger.LogDebug("Cleaned JSON: {Json}", cleanedJson);
+
+            // Validate JSON structure before deserializing
+            if (!IsValidJson(cleanedJson))
+            {
+                _logger.LogError("Invalid JSON structure after cleaning: {Json}", cleanedJson);
+                throw new InvalidOperationException("AI generated invalid JSON. Please try regenerating.");
+            }
+
+            var skills = JsonSerializer.Deserialize<List<GeneratedSkill>>(cleanedJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (skills == null || skills.Count == 0)
+            {
+                _logger.LogError("Deserialization resulted in empty skill list");
+                throw new InvalidOperationException("AI failed to generate skills. Please try again.");
+            }
+
+            // Validate skill data
+            foreach (var skill in skills)
+            {
+                if (string.IsNullOrWhiteSpace(skill.Name))
+                    throw new InvalidOperationException("AI generated skill with empty name. Please try again.");
+                
+                if (string.IsNullOrWhiteSpace(skill.Description))
+                    throw new InvalidOperationException("AI generated skill with empty description. Please try again.");
+            }
+
+            // Ensure correct ordering
+            var orderedSkills = skills.OrderBy(s => s.Order).ToList();
+            for (int i = 0; i < orderedSkills.Count; i++)
+            {
+                orderedSkills[i] = orderedSkills[i] with { Order = i };
+            }
+
+            _logger.LogInformation("Successfully generated {Count} skills", orderedSkills.Count);
+            return orderedSkills;
         }
-
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        var ollamaResponse = JsonSerializer.Deserialize<OllamaResponse>(responseJson,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-        var rawText = ollamaResponse?.Response ?? throw new InvalidOperationException("Empty response from Ollama.");
-
-        // Strip markdown code blocks if the model wrapped it anyway
-        var cleaned = rawText
-            .Replace("```json", "")
-            .Replace("```", "")
-            .Trim();
-
-        // Unescape if Mistral returned escaped JSON
-        if (cleaned.StartsWith("\\[") || cleaned.Contains("\\\""))
-            cleaned = System.Text.RegularExpressions.Regex.Unescape(cleaned);
-
-        var skillsWithOrderDeps = JsonSerializer.Deserialize<List<SkillWithOrderDeps>>(cleaned,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-            ?? throw new InvalidOperationException("Failed to deserialize skill tree from Ollama response.");
-
-        // Convert order-based dependencies to actual skill data
-        return skillsWithOrderDeps.Select(s => new GeneratedSkill
+        catch (JsonException ex)
         {
-            Name = s.Name,
-            Description = s.Description,
-            Order = s.Order
-        }).ToArray();
+            _logger.LogError(ex, "JSON parsing failed. Raw response might be malformed.");
+            throw new InvalidOperationException("AI generated invalid response format. Please try regenerating the skill tree.", ex);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during skill generation");
+            throw;
+        }
     }
 
-    // Internal class to parse the initial response with order-based dependencies
-    private sealed class SkillWithOrderDeps
+    private string CleanJsonResponse(string rawText)
     {
-        public string Name { get; init; } = string.Empty;
-        public string Description { get; init; } = string.Empty;
-        public int Order { get; init; }
-        public List<int> DependsOn { get; init; } = new();
+        // Remove markdown code blocks
+        var cleaned = Regex.Replace(rawText, @"```(?:json)?\s*", "", RegexOptions.IgnoreCase);
+        cleaned = cleaned.Replace("```", "");
+
+        // Find the JSON array in the text (sometimes AI adds preamble)
+        var arrayMatch = Regex.Match(cleaned, @"\[\s*\{.*\}\s*\]", RegexOptions.Singleline);
+        if (arrayMatch.Success)
+        {
+            cleaned = arrayMatch.Value;
+        }
+
+        // Trim whitespace
+        cleaned = cleaned.Trim();
+
+        // Unescape if needed
+        if (cleaned.StartsWith("\\[") || cleaned.Contains("\\\""))
+        {
+            cleaned = Regex.Unescape(cleaned);
+        }
+
+        // Remove any leading/trailing text that's not part of JSON
+        if (!cleaned.StartsWith("["))
+        {
+            var firstBracket = cleaned.IndexOf('[');
+            if (firstBracket >= 0)
+                cleaned = cleaned.Substring(firstBracket);
+        }
+
+        if (!cleaned.EndsWith("]"))
+        {
+            var lastBracket = cleaned.LastIndexOf(']');
+            if (lastBracket >= 0)
+                cleaned = cleaned.Substring(0, lastBracket + 1);
+        }
+
+        return cleaned;
+    }
+
+    private bool IsValidJson(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.ValueKind == JsonValueKind.Array;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private sealed class OllamaResponse

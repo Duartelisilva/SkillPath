@@ -1,7 +1,7 @@
 ﻿// Abstraction for AI-powered task generation for a skill.
 namespace SkillPath.Application.Abstractions.AI;
 
-public sealed class GeneratedTask
+public sealed record GeneratedTask
 {
     public string Title { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;

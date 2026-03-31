@@ -8,6 +8,7 @@ using SkillPath.Application.Goals.Queries.GetGoalById;
 using SkillPath.Application.Goals.Queries.ListGoals;
 using SkillPath.Application.Skills.Commands.CreateSkill;
 using SkillPath.Application.Skills.Commands.DeleteSkill;
+using SkillPath.Application.Skills.Commands.RegenerateTasks;
 using SkillPath.Application.Skills.Commands.UpdateSkill;
 using SkillPath.Application.Skills.Queries.GetSkillById;
 using SkillPath.Application.Skills.Queries.ListSkillsByGoal;
@@ -38,6 +39,7 @@ public static class DependencyInjection
         services.AddScoped<DeleteSkillHandler>();
         services.AddScoped<GetSkillByIdHandler>();
         services.AddScoped<ListSkillsByGoalHandler>();
+        services.AddScoped<RegenerateTasksForSkillHandler>();
 
         // Tasks
         services.AddScoped<CreateTaskHandler>();

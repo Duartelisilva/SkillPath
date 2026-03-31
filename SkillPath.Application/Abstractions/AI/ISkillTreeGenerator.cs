@@ -1,7 +1,7 @@
 ﻿// Abstraction for AI-powered skill tree generation.
 namespace SkillPath.Application.Abstractions.AI;
 
-public sealed class GeneratedSkill
+public sealed record GeneratedSkill
 {
     public string Name { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
