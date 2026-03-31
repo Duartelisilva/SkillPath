@@ -31,27 +31,24 @@ public sealed class OllamaTaskGenerator : ITaskGenerator
             Skill: {{{skillName}}}
             Skill Description: {{{skillDescription}}}
 
-            CRITICAL: Respond ONLY with a valid JSON array. No explanation, no markdown, no code blocks, no extra text.
+            CRITICAL RULES - FOLLOW EXACTLY:
+            1. Respond with ONLY a JSON array - no text before or after
+            2. Do NOT use markdown code blocks (no ```json or ```)
+            3. Start order at 0 and increment by 1 (must be: 0, 1, 2, 3, 4, 5)
+            4. Generate exactly 4-6 tasks
+            5. Each task should take 30-120 minutes
 
-            Each item must have exactly these fields:
-            - "title": short task title (max 200 chars)
-            - "description": what to do in this task (max 1000 chars)
-            - "order": integer starting from 0
-
-            IMPORTANT RULES:
-            - Generate exactly 4-6 tasks
-            - Tasks should be specific and actionable
-            - Each task should take 30 minutes to 2 hours
-            - Tasks should build on each other
-            - Use simple, direct language
-
-            Example format:
+            Required JSON structure (COPY THIS FORMAT EXACTLY):
             [
-              {"title": "Setup Environment", "description": "Install required tools", "order": 0},
-              {"title": "First Exercise", "description": "Complete tutorial", "order": 1}
+              {"title": "First task name", "description": "What to do first", "order": 0},
+              {"title": "Second task name", "description": "What to do second", "order": 1},
+              {"title": "Third task name", "description": "What to do third", "order": 2}
             ]
 
-            RESPOND WITH ONLY THE JSON ARRAY NOW:
+            MANDATORY: First task must have "order": 0
+            MANDATORY: Each subsequent task increments order by 1
+
+            Return ONLY the JSON array starting with [ and ending with ]
             """;
 
         try
@@ -101,31 +98,13 @@ public sealed class OllamaTaskGenerator : ITaskGenerator
             var tasks = JsonSerializer.Deserialize<List<GeneratedTask>>(cleanedJson,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            if (tasks == null || tasks.Count == 0)
-            {
-                _logger.LogWarning("No tasks generated for skill: {Skill}", skillName);
-                throw new InvalidOperationException($"AI failed to generate tasks for skill {skillName}");
-            }
+            // Validate and auto-fix any ordering or data issues
+            var validatedTasks = ValidateAndFixTasks(tasks ?? new List<GeneratedTask>(), skillName);
 
-            // Validate task data
-            foreach (var task in tasks)
-            {
-                if (string.IsNullOrWhiteSpace(task.Title))
-                    throw new InvalidOperationException($"AI generated task with empty title for skill {skillName}");
+            _logger.LogInformation("Successfully generated {Count} tasks for skill {Skill}",
+                validatedTasks.Count, skillName);
 
-                if (string.IsNullOrWhiteSpace(task.Description))
-                    throw new InvalidOperationException($"AI generated task with empty description for skill {skillName}");
-            }
-
-            // Ensure correct ordering
-            var orderedTasks = tasks.OrderBy(t => t.Order).ToList();
-            for (int i = 0; i < orderedTasks.Count; i++)
-            {
-                orderedTasks[i] = orderedTasks[i] with { Order = i };
-            }
-
-            _logger.LogInformation("Successfully generated {Count} tasks for skill {Skill}", orderedTasks.Count, skillName);
-            return orderedTasks;
+            return validatedTasks;
         }
         catch (JsonException ex)
         {
@@ -189,6 +168,50 @@ public sealed class OllamaTaskGenerator : ITaskGenerator
         {
             return false;
         }
+    }
+
+    private List<GeneratedTask> ValidateAndFixTasks(List<GeneratedTask> tasks, string skillName)
+    {
+        if (tasks == null || tasks.Count == 0)
+        {
+            _logger.LogError("No tasks generated for skill: {Skill}", skillName);
+            throw new InvalidOperationException($"AI generated zero tasks for skill {skillName}");
+        }
+
+        _logger.LogInformation("Validating {Count} tasks for skill: {Skill}", tasks.Count, skillName);
+
+        // Validate each task has required fields
+        foreach (var task in tasks)
+        {
+            if (string.IsNullOrWhiteSpace(task.Title))
+            {
+                _logger.LogError("Task with empty title found for skill: {Skill}", skillName);
+                throw new InvalidOperationException($"AI generated task with empty title for skill {skillName}");
+            }
+
+            if (string.IsNullOrWhiteSpace(task.Description))
+            {
+                _logger.LogError("Task with empty description found for skill: {Skill}", skillName);
+                throw new InvalidOperationException($"AI generated task with empty description for skill {skillName}");
+            }
+        }
+
+        // CRITICAL: Fix ordering issues
+        // Sort by current order, then reassign 0, 1, 2, 3...
+        var fixedTasks = tasks
+            .OrderBy(t => t.Order)
+            .Select((task, index) => new GeneratedTask
+            {
+                Title = task.Title.Trim(),
+                Description = task.Description.Trim(),
+                Order = index  // Force correct sequential ordering starting from 0
+            })
+            .ToList();
+
+        _logger.LogInformation("Fixed task ordering for skill {Skill}: now {Count} tasks with order 0-{Max}",
+            skillName, fixedTasks.Count, fixedTasks.Count - 1);
+
+        return fixedTasks;
     }
 
     private sealed class OllamaResponse

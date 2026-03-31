@@ -109,34 +109,23 @@ public sealed class OllamaSkillTreeGenerator : ISkillTreeGenerator
                 throw new InvalidOperationException("AI generated invalid JSON. Please try regenerating.");
             }
 
-            var skills = JsonSerializer.Deserialize<List<GeneratedSkill>>(cleanedJson,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var generatedSkills = JsonSerializer.Deserialize<List<GeneratedSkill>>(cleanedJson,
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                            ?? throw new InvalidOperationException("Failed to deserialize skill tree from Ollama response.");
 
-            if (skills == null || skills.Count == 0)
+            // Convert to GeneratedSkill
+            generatedSkills = generatedSkills.Select(s => new GeneratedSkill
             {
-                _logger.LogError("Deserialization resulted in empty skill list");
-                throw new InvalidOperationException("AI failed to generate skills. Please try again.");
-            }
+                Name = s.Name,
+                Description = s.Description,
+                Order = s.Order
+            }).ToList();
 
-            // Validate skill data
-            foreach (var skill in skills)
-            {
-                if (string.IsNullOrWhiteSpace(skill.Name))
-                    throw new InvalidOperationException("AI generated skill with empty name. Please try again.");
-                
-                if (string.IsNullOrWhiteSpace(skill.Description))
-                    throw new InvalidOperationException("AI generated skill with empty description. Please try again.");
-            }
+            // Validate and fix
+            var validatedSkills = ValidateAndFixSkills(generatedSkills, goalTitle);
 
-            // Ensure correct ordering
-            var orderedSkills = skills.OrderBy(s => s.Order).ToList();
-            for (int i = 0; i < orderedSkills.Count; i++)
-            {
-                orderedSkills[i] = orderedSkills[i] with { Order = i };
-            }
-
-            _logger.LogInformation("Successfully generated {Count} skills", orderedSkills.Count);
-            return orderedSkills;
+            _logger.LogInformation("Successfully generated {Count} skills", validatedSkills.Count);
+            return validatedSkills;
         }
         catch (JsonException ex)
         {
@@ -201,6 +190,49 @@ public sealed class OllamaSkillTreeGenerator : ISkillTreeGenerator
         {
             return false;
         }
+    }
+
+    private List<GeneratedSkill> ValidateAndFixSkills(List<GeneratedSkill> skills, string goalTitle)
+    {
+        if (skills == null || skills.Count == 0)
+        {
+            _logger.LogError("No skills generated for goal: {Goal}", goalTitle);
+            throw new InvalidOperationException($"AI generated zero skills for goal {goalTitle}");
+        }
+
+        _logger.LogInformation("Validating {Count} skills for goal: {Goal}", skills.Count, goalTitle);
+
+        // Validate each skill
+        foreach (var skill in skills)
+        {
+            if (string.IsNullOrWhiteSpace(skill.Name))
+            {
+                _logger.LogError("Skill with empty name found for goal: {Goal}", goalTitle);
+                throw new InvalidOperationException($"AI generated skill with empty name for goal {goalTitle}");
+            }
+
+            if (string.IsNullOrWhiteSpace(skill.Description))
+            {
+                _logger.LogError("Skill with empty description found for goal: {Goal}", goalTitle);
+                throw new InvalidOperationException($"AI generated skill with empty description for goal {goalTitle}");
+            }
+        }
+
+        // Fix ordering - ensure 0, 1, 2, 3...
+        var fixedSkills = skills
+            .OrderBy(s => s.Order)
+            .Select((skill, index) => new GeneratedSkill
+            {
+                Name = skill.Name.Trim(),
+                Description = skill.Description.Trim(),
+                Order = index  // Force correct sequential ordering
+            })
+            .ToList();
+
+        _logger.LogInformation("Fixed skill ordering for goal {Goal}: now {Count} skills with order 0-{Max}",
+            goalTitle, fixedSkills.Count, fixedSkills.Count - 1);
+
+        return fixedSkills;
     }
 
     private sealed class OllamaResponse

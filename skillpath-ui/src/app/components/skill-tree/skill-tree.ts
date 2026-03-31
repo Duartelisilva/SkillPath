@@ -40,7 +40,7 @@ import cytoscape from 'cytoscape';
               <h3>Tasks</h3>
               <button class="btn-regenerate" 
                       (click)="regenerateTasks()" 
-                      [disabled]="regeneratingTasks() || selectedSkill()?.status === 'Locked' || selectedSkill()?.status === 'Completed'"
+                      [disabled]="regeneratingTasks() || selectedSkill()?.status === 'Completed'"
                       title="Regenerate tasks for this skill">
                 {{ regeneratingTasks() ? '⚙ Regenerating...' : '🔄 Regenerate' }}
               </button>
@@ -490,7 +490,7 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
         name: 'breadthfirst',
         directed: true,
         padding: 80,
-        spacingFactor: 2.0,
+        spacingFactor: 1,
         avoidOverlap: true,
       },
       minZoom: 0.3,
