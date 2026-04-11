@@ -79,11 +79,24 @@ public sealed class UpdateTaskStatusHandler
         if (allTasks.Count == 0)
             return;
 
-        var allCompleted = allTasks.All(t => t.Status == LearningTaskStatus.Completed);
+        var earnedXP = allTasks
+            .Where(t => t.Status == LearningTaskStatus.Completed)
+            .Sum(t => t.ExperiencePoints);
 
-        if (allCompleted && skill.Status != SkillStatus.Completed)
+        var requiredXP = skill.RequiredExperiencePoints;
+
+        if (earnedXP >= requiredXP && skill.Status != SkillStatus.Completed)
         {
             skill.Complete();
+
+            foreach (var task in allTasks)
+            {
+                if (task.Status != LearningTaskStatus.Completed)
+                {
+                    task.ZeroExperiencePoints();
+                }
+            }
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             // Unlock dependent skills

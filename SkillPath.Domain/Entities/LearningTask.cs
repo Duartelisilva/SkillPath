@@ -15,15 +15,17 @@ public sealed class LearningTask : BaseEntity
     public DateTime CreatedAtUtc { get; private set; } = DateTime.UtcNow;
     public DateTime? UpdatedAtUtc { get; private set; }
     public DateTime? CompletedAtUtc { get; private set; }
+    public int ExperiencePoints { get; private set; }
 
     private LearningTask() { }
 
-    public LearningTask(Guid skillId, string title, string description, int order)
+    public LearningTask(Guid skillId, string title, string description, int order, int experiencePoints = 0)
     {
         SkillId = skillId;
         SetTitle(title);
         SetDescription(description);
         SetOrder(order);
+        SetExperiencePoints(experiencePoints);
         Status = LearningTaskStatus.NotStarted;
         CreatedAtUtc = DateTime.UtcNow;
     }
@@ -58,6 +60,20 @@ public sealed class LearningTask : BaseEntity
         Status = LearningTaskStatus.NotStarted;
         CompletedAtUtc = null;
         UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    public void ZeroExperiencePoints()
+    {
+        ExperiencePoints = 0;
+        UpdatedAtUtc = DateTime.UtcNow;
+    }
+
+    private void SetExperiencePoints(int experiencePoints)
+    {
+        if (experiencePoints < 0)
+            throw new DomainException("Experience points must be non-negative.");
+
+        ExperiencePoints = experiencePoints;
     }
 
     public void UpdateDetails(string title, string description)

@@ -22,6 +22,7 @@ public sealed class OllamaTaskGenerator : ITaskGenerator
         string skillName,
         string skillDescription,
         string goalTitle,
+        int requiredXP,
         CancellationToken cancellationToken)
     {
         var prompt = $$$"""
@@ -35,7 +36,7 @@ public sealed class OllamaTaskGenerator : ITaskGenerator
             1. Respond with ONLY a JSON array - no text before or after
             2. Do NOT use markdown code blocks (no ```json or ```)
             3. Start order at 0 and increment by 1 (must be: 0, 1, 2, 3, 4, 5)
-            4. Generate exactly 4-6 tasks
+            4. Generate exactly 5-7 tasks
             5. Each task should take 30-120 minutes
 
             Required JSON structure (COPY THIS FORMAT EXACTLY):
@@ -99,7 +100,7 @@ public sealed class OllamaTaskGenerator : ITaskGenerator
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             // Validate and auto-fix any ordering or data issues
-            var validatedTasks = ValidateAndFixTasks(tasks ?? new List<GeneratedTask>(), skillName);
+            var validatedTasks = ValidateAndFixTasks(tasks ?? new List<GeneratedTask>(), skillName, requiredXP);
 
             _logger.LogInformation("Successfully generated {Count} tasks for skill {Skill}",
                 validatedTasks.Count, skillName);
@@ -170,7 +171,7 @@ public sealed class OllamaTaskGenerator : ITaskGenerator
         }
     }
 
-    private List<GeneratedTask> ValidateAndFixTasks(List<GeneratedTask> tasks, string skillName)
+    private List<GeneratedTask> ValidateAndFixTasks(List<GeneratedTask> tasks, string skillName, int requiredXP)
     {
         if (tasks == null || tasks.Count == 0)
         {
@@ -196,6 +197,9 @@ public sealed class OllamaTaskGenerator : ITaskGenerator
             }
         }
 
+        // Assign random but well-distributed XP values
+        var xpValues = GenerateDistributedXP(tasks.Count, requiredXP);
+
         // CRITICAL: Fix ordering issues
         // Sort by current order, then reassign 0, 1, 2, 3...
         var fixedTasks = tasks
@@ -204,14 +208,46 @@ public sealed class OllamaTaskGenerator : ITaskGenerator
             {
                 Title = task.Title.Trim(),
                 Description = task.Description.Trim(),
-                Order = index  // Force correct sequential ordering starting from 0
+                Order = index,  // Force correct sequential ordering starting from 0
+                ExperiencePoints = xpValues[index]
             })
             .ToList();
-
-        _logger.LogInformation("Fixed task ordering for skill {Skill}: now {Count} tasks with order 0-{Max}",
-            skillName, fixedTasks.Count, fixedTasks.Count - 1);
+        var totalXP = fixedTasks.Sum(t => t.ExperiencePoints);
+        _logger.LogInformation("Fixed task ordering for skill {Skill}: now {Count} tasks with order 0-{Max}, Total XP: {TotalXP}",
+            skillName, fixedTasks.Count, fixedTasks.Count - 1, totalXP);
 
         return fixedTasks;
+    }
+
+    private List<int> GenerateDistributedXP(int taskCount, int requiredXP)
+    {
+        if (taskCount == 0)
+            return new List<int>();
+
+        var xpValues = new List<int>();
+
+        // Target total XP pool larger than completion requirement
+        var totalXPBudget = requiredXP * 1.6; // allows skipping tasks
+
+
+        // Descending XP curve (earlier tasks worth more)
+        var weightSum = Enumerable.Range(1, taskCount).Sum();
+
+        for (int i = 0; i < taskCount; i++)
+        {
+            var weight = taskCount - i;
+            var xp = (int)Math.Round(
+                (double)weight / weightSum * totalXPBudget);
+
+            xpValues.Add(Math.Max(15, xp));
+        }
+
+        _logger.LogInformation(
+            "Generated weighted XP distribution: [{XP}], Total: {Total}",
+            string.Join(", ", xpValues),
+            xpValues.Sum());
+
+        return xpValues;
     }
 
     private sealed class OllamaResponse

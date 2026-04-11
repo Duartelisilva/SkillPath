@@ -113,6 +113,7 @@ public sealed class GenerateSkillTreeHandler
                     skill.Name,
                     skill.Description,
                     goal.Title,
+                    skill.RequiredExperiencePoints,
                     cancellationToken);
 
                 _logger.LogInformation("AI generated {Count} tasks for skill {SkillName}",
@@ -120,11 +121,11 @@ public sealed class GenerateSkillTreeHandler
 
                 foreach (var genTask in generatedTasks)
                 {
-                    var task = new LearningTask(skill.Id, genTask.Title, genTask.Description, genTask.Order);
+                    var task = new LearningTask(skill.Id, genTask.Title, genTask.Description, genTask.Order, genTask.ExperiencePoints);
                     await _taskRepository.AddAsync(task, cancellationToken);
                     totalTasksGenerated++;
-                    _logger.LogInformation("Created task: {TaskTitle} (Order: {Order})",
-                        genTask.Title, genTask.Order);
+                    _logger.LogInformation("Created task: {TaskTitle} (Order: {Order}, XP: {XP})",
+                        genTask.Title, genTask.Order, genTask.ExperiencePoints);
                 }
             }
             catch (Exception ex)

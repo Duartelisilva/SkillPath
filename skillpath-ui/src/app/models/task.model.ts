@@ -8,4 +8,5 @@ export interface LearningTask {
   createdAtUtc: string;
   updatedAtUtc: string | null;
   completedAtUtc: string | null;
+  experiencePoints: number;
 }

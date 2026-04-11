@@ -65,6 +65,7 @@ public sealed class RegenerateTasksForSkillHandler
                 skill.Name,
                 skill.Description,
                 goal.Title,
+                skill.RequiredExperiencePoints,
                 cancellationToken);
 
             _logger.LogInformation("AI generated {Count} new tasks for skill {SkillName}",
@@ -74,11 +75,11 @@ public sealed class RegenerateTasksForSkillHandler
 
             foreach (var genTask in generatedTasks)
             {
-                var task = new LearningTask(skill.Id, genTask.Title, genTask.Description, genTask.Order);
+                var task = new LearningTask(skill.Id, genTask.Title, genTask.Description, genTask.Order, genTask.ExperiencePoints);
                 await _taskRepository.AddAsync(task, cancellationToken);
                 newTasks.Add(task);
-                _logger.LogInformation("Created task: {TaskTitle} (Order: {Order})",
-                    genTask.Title, genTask.Order);
+                _logger.LogInformation("Created task: {TaskTitle} (Order: {Order}, XP: {XP})",
+                    genTask.Title, genTask.Order, genTask.ExperiencePoints);
             }
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);

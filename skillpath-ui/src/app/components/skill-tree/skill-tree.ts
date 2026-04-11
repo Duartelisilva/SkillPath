@@ -58,7 +58,12 @@ import cytoscape from 'cytoscape';
                   <span *ngIf="task.status === 'NotStarted'" class="empty-icon">○</span>
                 </div>
                 <div class="task-content">
-                  <p class="task-title">{{ task.title }}</p>
+                  <div class="task-header-row">
+                    <p class="task-title">{{ task.title }}</p>
+                    <span class="task-xp" [class.zero]="task.experiencePoints === 0">
+                      {{ task.experiencePoints }} XP
+                    </span>
+                  </div>
                   <p class="task-desc">{{ task.description }}</p>
                 </div>
               </div>
@@ -334,6 +339,41 @@ import cytoscape from 'cytoscape';
       animation: spin 0.8s linear infinite;
     }
 
+    .task-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .task-xp {
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: 'Rajdhani', sans-serif;
+      color: var(--accent-cyan);
+      background: rgba(6, 182, 212, 0.15);
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid rgba(6, 182, 212, 0.3);
+      white-space: nowrap;
+      flex-shrink: 0;
+
+      &.zero {
+        color: var(--text-muted);
+        background: rgba(71, 85, 105, 0.15);
+        border-color: rgba(71, 85, 105, 0.3);
+        text-decoration: line-through;
+      }
+    }
+
+    .task-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      margin: 0;
+      flex: 1;
+    }
     @keyframes spin { to { transform: rotate(360deg); } }
   `]
 })

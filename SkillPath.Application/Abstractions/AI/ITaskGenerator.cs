@@ -6,6 +6,7 @@ public sealed record GeneratedTask
     public string Title { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
     public int Order { get; init; }
+    public int ExperiencePoints { get; init; }
 }
 
 public interface ITaskGenerator
@@ -14,5 +15,6 @@ public interface ITaskGenerator
         string skillName,
         string skillDescription,
         string goalTitle,
+        int RequiredExperiencePoints,
         CancellationToken cancellationToken);
 }

@@ -14,6 +14,7 @@ public sealed class LearningTaskDto
     public DateTime CreatedAtUtc { get; init; }
     public DateTime? UpdatedAtUtc { get; init; }
     public DateTime? CompletedAtUtc { get; init; }
+    public int ExperiencePoints { get; init; }
 
     public static LearningTaskDto FromEntity(LearningTask task) => new()
     {
@@ -25,6 +26,7 @@ public sealed class LearningTaskDto
         Status = task.Status.ToString(),
         CreatedAtUtc = task.CreatedAtUtc,
         UpdatedAtUtc = task.UpdatedAtUtc,
-        CompletedAtUtc = task.CompletedAtUtc
+        CompletedAtUtc = task.CompletedAtUtc,
+        ExperiencePoints = task.ExperiencePoints
     };
 }

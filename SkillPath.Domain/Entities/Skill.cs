@@ -14,12 +14,14 @@ public sealed class Skill : BaseEntity
     public SkillStatus Status { get; private set; } = SkillStatus.Locked;
     public DateTime CreatedAtUtc { get; private set; } = DateTime.UtcNow;
     public DateTime? UpdatedAtUtc { get; private set; }
+    public int RequiredExperiencePoints = 100;
 
     private readonly List<Guid> _dependsOn = new();
     public IReadOnlyCollection<Guid> DependsOn => _dependsOn.AsReadOnly();
 
     private readonly List<LearningTask> _tasks = new();
     public IReadOnlyCollection<LearningTask> Tasks => _tasks.AsReadOnly();
+
     private Skill() { }
 
     public Skill(Guid goalId, string name, string description, int order)
