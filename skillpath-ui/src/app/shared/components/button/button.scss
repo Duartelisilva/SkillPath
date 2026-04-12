@@ -1,0 +1,144 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  position: relative;
+  overflow: hidden;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent-purple);
+    outline-offset: 2px;
+  }
+}
+
+// Sizes
+.btn-sm {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.875rem;
+  border-radius: 6px;
+}
+
+.btn-md {
+  padding: 0.6rem 1.2rem;
+  font-size: 1rem;
+}
+
+.btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.125rem;
+  border-radius: 10px;
+}
+
+// Variants
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+  color: white;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.4);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+}
+
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-accent);
+
+  &:hover:not(:disabled) {
+    background: var(--bg-card-hover);
+    border-color: var(--accent-purple);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+}
+
+.btn-danger {
+  background: var(--accent-red);
+  color: white;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-primary);
+  border: 1px solid transparent;
+
+  &:hover:not(:disabled) {
+    background: rgba(124, 58, 237, 0.1);
+    border-color: var(--accent-purple);
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+}
+
+// Full width
+.btn-full-width {
+  width: 100%;
+}
+
+// Loading state
+.btn-loading {
+  cursor: wait;
+  pointer-events: none;
+}
+
+.button-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.button-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: opacity 0.2s;
+
+  &.hidden {
+    opacity: 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: translateX(-50%) rotate(360deg);
+  }
+}
