@@ -1,58 +1,134 @@
 import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../services/api.service';
+import { Goal } from '../../models/goal.model';
 import { Skill } from '../../models/skill.model';
 import { LearningTask } from '../../models/task.model';
 import cytoscape from 'cytoscape';
 
+// Import components
+import { ButtonComponent } from '../../shared/components/button/button';
+import { BadgeComponent } from '../../shared/components/badge/badge';
+import { BadgeVariant } from '../../shared/components/badge/badge';
+import { ProgressBarComponent } from '../../shared/components/progress-bar/progress-bar';
+import { SpinnerComponent } from '../../shared/components/spinner/spinner';
+import { ModalComponent } from '../../shared/components/modal/modal';
+
 @Component({
   selector: 'app-skill-tree',
   standalone: true,
-  imports: [CommonModule],
+  imports: [
+    CommonModule,
+    RouterLink,
+    ButtonComponent,
+    BadgeComponent,
+    ProgressBarComponent,
+    SpinnerComponent,
+    ModalComponent
+  ],
   template: `
     <div class="skill-tree-page">
-      <header class="page-header">
-        <button class="btn btn-secondary back-btn" (click)="goBack()">← Back</button>
-        <h1 class="page-title">Skill Tree</h1>
-        <div class="zoom-controls">
-          <button class="btn btn-secondary zoom-btn" (click)="resetZoom()">Reset View</button>
+      <!-- Breadcrumb Navigation (NEW!) -->
+      <nav class="breadcrumb" *ngIf="!loading()">
+        <a routerLink="/goals" class="breadcrumb-link">
+          <span class="breadcrumb-icon">🏠</span>
+          Goals
+        </a>
+        <span class="breadcrumb-separator">›</span>
+        <span class="breadcrumb-current">{{ currentGoal()?.title || 'Skill Tree' }}</span>
+      </nav>
+
+      <!-- Goal Header (NEW!) -->
+      <header class="goal-header" *ngIf="!loading() && currentGoal()">
+        <div class="goal-header-content">
+          <div class="goal-header-main">
+            <h1 class="goal-header-title">{{ currentGoal()!.title }}</h1>
+             <app-badge [variant]="getStatusBadgeVariant(currentGoal()!.status)">
+              {{ currentGoal()!.status }}
+            </app-badge>
+          </div>
+          <p class="goal-header-description">{{ currentGoal()!.description }}</p>
+        </div>
+        <div class="goal-header-actions">
+          <app-button variant="secondary" size="sm" (clicked)="resetZoom()">
+            🔍 Reset View
+          </app-button>
+          <app-button variant="secondary" size="sm" (clicked)="goBack()">
+            ← Back to Goals
+          </app-button>
         </div>
       </header>
 
       <div class="layout" *ngIf="!loading()">
         <div #cyContainer class="cy-container"></div>
 
-        <!-- Task Panel -->
+        <!-- Enhanced Task Panel -->
         <div class="task-panel" [class.open]="selectedSkill() !== null">
           <div class="panel-header" *ngIf="selectedSkill()">
             <div class="skill-info">
-              <span class="skill-status-dot {{ selectedSkill()!.status }}"></span>
+              <app-badge
+                [variant]="getSkillStatusBadgeVariant(selectedSkill()!.status)"
+                [showDot]="true"
+                size="sm"
+              >
+                {{ selectedSkill()!.status }}
+              </app-badge>
               <h2>{{ selectedSkill()!.name }}</h2>
             </div>
-            <button class="close-btn" (click)="closePanel()">✕</button>
+            <app-button
+              variant="ghost"
+              size="sm"
+              (clicked)="closePanel()"
+              class="close-btn-wrapper"
+            >
+              ✕
+            </app-button>
           </div>
 
-          <p class="skill-desc" *ngIf="selectedSkill()">{{ selectedSkill()!.description }}</p>
+          <p class="skill-desc" *ngIf="selectedSkill()">
+            {{ selectedSkill()!.description }}
+          </p>
+
+          <!-- XP Progress Bar (NEW!) -->
+          <div class="xp-progress-section" *ngIf="selectedSkill() && tasks().length > 0">
+            <app-progress-bar
+              label="Experience Points"
+              [current]="getEarnedXP()"
+              [max]="selectedSkill()!.requiredExperiencePoints || 100"
+              unit="XP"
+              variant="xp"
+              size="md"
+              [showPercentage]="true"
+            />
+          </div>
 
           <div class="tasks-section" *ngIf="selectedSkill()">
             <div class="tasks-header">
               <h3>Tasks</h3>
-              <button class="btn-regenerate" 
-                      (click)="regenerateTasks()" 
-                      [disabled]="regeneratingTasks() || selectedSkill()?.status === 'Completed'"
-                      title="Regenerate tasks for this skill">
+              <app-button
+                variant="ghost"
+                size="sm"
+                (clicked)="showRegenerateModal.set(true)"
+                [disabled]="regeneratingTasks() || selectedSkill()?.status === 'Completed'"
+              >
                 {{ regeneratingTasks() ? '⚙ Regenerating...' : '🔄 Regenerate' }}
-              </button>
+              </app-button>
             </div>
+
+            <!-- Tasks Loading -->
             <div *ngIf="tasksLoading()" class="tasks-loading">
-              <div class="mini-spinner"></div>
+              <app-spinner size="sm" variant="primary" />
             </div>
+
+            <!-- Task List -->
             <div class="task-list" *ngIf="!tasksLoading()">
               <div class="task-item {{ task.status }}" *ngFor="let task of tasks()">
-                <div class="task-check" 
-                     (click)="toggleTaskStatus(task)"
-                     [class.disabled]="!canToggleTask(task)">
+                <div
+                  class="task-check"
+                  (click)="toggleTaskStatus(task)"
+                  [class.disabled]="!canToggleTask(task)"
+                >
                   <span *ngIf="task.status === 'Completed'" class="check-icon">✓</span>
                   <span *ngIf="task.status === 'InProgress'" class="progress-icon">◎</span>
                   <span *ngIf="task.status === 'NotStarted'" class="empty-icon">○</span>
@@ -60,23 +136,58 @@ import cytoscape from 'cytoscape';
                 <div class="task-content">
                   <div class="task-header-row">
                     <p class="task-title">{{ task.title }}</p>
-                    <span class="task-xp" [class.zero]="task.experiencePoints === 0">
+                    <app-badge
+                      [variant]="task.experiencePoints === 0 ? 'archived' : 'info'"
+                      size="sm"
+                    >
                       {{ task.experiencePoints }} XP
-                    </span>
+                    </app-badge>
                   </div>
                   <p class="task-desc">{{ task.description }}</p>
                 </div>
               </div>
-              <div *ngIf="tasks().length === 0" class="no-tasks">No tasks generated for this skill.</div>
+              <div *ngIf="tasks().length === 0" class="no-tasks">
+                <span class="no-tasks-icon">📝</span>
+                <p>No tasks generated for this skill.</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="loading" *ngIf="loading()">
-        <div class="spinner"></div>
-        <p>Loading skill tree...</p>
+      <!-- Loading State -->
+      <div class="loading-container" *ngIf="loading()">
+        <app-spinner size="xl" variant="primary" text="Loading skill tree..." />
       </div>
+
+      <!-- Regenerate Confirmation Modal -->
+      <app-modal
+        [isOpen]="showRegenerateModal()"
+        size="sm"
+        [hasFooter]="true"
+        (closed)="showRegenerateModal.set(false)"
+      >
+        <h2 modal-header>Regenerate Tasks?</h2>
+        <p>This will delete all existing tasks for <strong>{{ selectedSkill()?.name }}</strong> and generate new ones using AI.</p>
+        <p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 0.5rem;">
+          ⚠️ This action cannot be undone.
+        </p>
+
+        <div modal-footer class="modal-actions">
+          <app-button
+            variant="secondary"
+            (clicked)="showRegenerateModal.set(false)"
+          >
+            Cancel
+          </app-button>
+          <app-button
+            variant="primary"
+            (clicked)="confirmRegenerateTasks()"
+          >
+            Regenerate Tasks
+          </app-button>
+        </div>
+      </app-modal>
     </div>
   `,
   styles: [`
@@ -87,37 +198,105 @@ import cytoscape from 'cytoscape';
       flex-direction: column;
     }
 
-    .page-header {
+    /* Breadcrumb Navigation */
+    .breadcrumb {
       display: flex;
       align-items: center;
-      gap: 1.5rem;
+      gap: 0.5rem;
+      padding: 1rem 2rem;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-accent);
+      font-size: 0.875rem;
+    }
+
+    .breadcrumb-link {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.2s;
+
+      &:hover {
+        color: var(--accent-purple);
+      }
+    }
+
+    .breadcrumb-icon {
+      font-size: 1rem;
+    }
+
+    .breadcrumb-separator {
+      color: var(--text-muted);
+    }
+
+    .breadcrumb-current {
+      color: var(--text-primary);
+      font-weight: 500;
+      max-width: 300px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Goal Header */
+    .goal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 2rem;
       padding: 1.5rem 2rem;
+      background: var(--bg-card);
       border-bottom: 1px solid var(--border-accent);
     }
 
-    .page-title {
+    .goal-header-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .goal-header-main {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .goal-header-title {
       font-size: 1.75rem;
       background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      flex: 1;
+      margin: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
-    .zoom-controls {
+    .goal-header-description {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin: 0;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .goal-header-actions {
       display: flex;
-      gap: 0.5rem;
+      gap: 0.75rem;
+      flex-shrink: 0;
     }
 
-    .zoom-btn {
-      padding: 0.5rem 1rem;
-    }
-
+    /* Layout */
     .layout {
       display: flex;
       position: relative;
       flex: 1;
       overflow: hidden;
-      height: calc(100vh - 80px);
+      height: calc(100vh - 200px);
     }
 
     .cy-container {
@@ -125,6 +304,7 @@ import cytoscape from 'cytoscape';
       background: var(--bg-secondary);
     }
 
+    /* Task Panel */
     .task-panel {
       position: absolute;
       top: 0;
@@ -139,10 +319,11 @@ import cytoscape from 'cytoscape';
       flex-direction: column;
       overflow-y: auto;
       z-index: 10;
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
     }
 
     .task-panel.open {
-      width: 400px;
+      width: 420px;
       padding: 1.5rem;
     }
 
@@ -151,42 +332,25 @@ import cytoscape from 'cytoscape';
       justify-content: space-between;
       align-items: flex-start;
       margin-bottom: 1rem;
+      gap: 1rem;
     }
 
     .skill-info {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .skill-status-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      flex-shrink: 0;
-
-      &.Locked { background: var(--locked); }
-      &.Available { background: var(--available); }
-      &.InProgress { background: var(--in-progress); }
-      &.Completed { background: var(--completed); }
+      flex: 1;
+      min-width: 0;
     }
 
     .skill-info h2 {
       font-size: 1.4rem;
       color: var(--text-primary);
+      margin: 0.5rem 0 0 0;
+      line-height: 1.3;
     }
 
-    .close-btn {
-      background: none;
-      border: none;
-      color: var(--text-muted);
+    .close-btn-wrapper {
+      flex-shrink: 0;
+      padding: 0.25rem 0.5rem !important;
       font-size: 1.25rem;
-      cursor: pointer;
-      padding: 0.25rem;
-      line-height: 1;
-      transition: color 0.2s;
-
-      &:hover { color: var(--text-primary); }
     }
 
     .skill-desc {
@@ -196,6 +360,20 @@ import cytoscape from 'cytoscape';
       margin-bottom: 1.5rem;
     }
 
+    /* XP Progress Section */
+    .xp-progress-section {
+      margin-bottom: 1.5rem;
+      padding: 1rem;
+      background: rgba(124, 58, 237, 0.05);
+      border: 1px solid rgba(124, 58, 237, 0.2);
+      border-radius: 8px;
+    }
+
+    /* Tasks Section */
+    .tasks-section {
+      flex: 1;
+    }
+
     .tasks-header {
       display: flex;
       justify-content: space-between;
@@ -203,7 +381,7 @@ import cytoscape from 'cytoscape';
       margin-bottom: 1rem;
     }
 
-    .tasks-section h3 {
+    .tasks-header h3 {
       font-size: 0.85rem;
       color: var(--text-secondary);
       text-transform: uppercase;
@@ -211,52 +389,48 @@ import cytoscape from 'cytoscape';
       margin: 0;
     }
 
-    .btn-regenerate {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-accent);
-      color: var(--text-primary);
-      padding: 0.4rem 0.8rem;
-      border-radius: 6px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-
-      &:hover:not(:disabled) {
-        border-color: var(--accent-purple);
-        background: var(--bg-card-hover);
-      }
-
-      &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
     }
 
     .task-item {
       display: flex;
       gap: 0.75rem;
-      padding: 0.75rem;
+      padding: 0.875rem;
       border-radius: 8px;
-      margin-bottom: 0.5rem;
       border: 1px solid var(--border-accent);
       background: var(--bg-secondary);
       transition: all 0.2s ease;
 
       &:hover {
         border-color: var(--accent-purple);
+        background: var(--bg-card-hover);
       }
 
       &.Completed {
         border-color: rgba(16, 185, 129, 0.3);
-        .task-check { color: var(--completed); }
+        background: rgba(16, 185, 129, 0.05);
+
+        .task-check {
+          color: var(--completed);
+        }
       }
+
       &.InProgress {
         border-color: rgba(245, 158, 11, 0.3);
-        .task-check { color: var(--in-progress); }
+        background: rgba(245, 158, 11, 0.05);
+
+        .task-check {
+          color: var(--in-progress);
+        }
       }
+
       &.NotStarted {
-        .task-check { color: var(--text-muted); }
+        .task-check {
+          color: var(--text-muted);
+        }
       }
     }
 
@@ -267,6 +441,11 @@ import cytoscape from 'cytoscape';
       cursor: pointer;
       transition: transform 0.2s ease;
       user-select: none;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
 
       &:hover:not(.disabled) {
         transform: scale(1.3);
@@ -280,63 +459,11 @@ import cytoscape from 'cytoscape';
         cursor: not-allowed;
         opacity: 0.5;
       }
-
-      .check-icon, .progress-icon, .empty-icon {
-        display: inline-block;
-        width: 22px;
-        height: 22px;
-        text-align: center;
-        line-height: 22px;
-      }
     }
 
-    .task-title {
-      font-weight: 600;
-      color: var(--text-primary);
-      font-size: 0.9rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .task-desc {
-      color: var(--text-secondary);
-      font-size: 0.8rem;
-      line-height: 1.5;
-    }
-
-    .no-tasks, .tasks-loading {
-      color: var(--text-muted);
-      text-align: center;
-      padding: 2rem 0;
-      font-size: 0.9rem;
-    }
-
-    .mini-spinner {
-      width: 24px;
-      height: 24px;
-      border: 2px solid var(--border-accent);
-      border-top-color: var(--accent-purple);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto;
-    }
-
-    .loading {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+    .task-content {
       flex: 1;
-      gap: 1rem;
-      color: var(--text-secondary);
-    }
-
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--border-accent);
-      border-top-color: var(--accent-purple);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+      min-width: 0;
     }
 
     .task-header-row {
@@ -344,27 +471,7 @@ import cytoscape from 'cytoscape';
       justify-content: space-between;
       align-items: flex-start;
       gap: 0.5rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .task-xp {
-      font-size: 0.75rem;
-      font-weight: 700;
-      font-family: 'Rajdhani', sans-serif;
-      color: var(--accent-cyan);
-      background: rgba(6, 182, 212, 0.15);
-      padding: 0.2rem 0.5rem;
-      border-radius: 4px;
-      border: 1px solid rgba(6, 182, 212, 0.3);
-      white-space: nowrap;
-      flex-shrink: 0;
-
-      &.zero {
-        color: var(--text-muted);
-        background: rgba(71, 85, 105, 0.15);
-        border-color: rgba(71, 85, 105, 0.3);
-        text-decoration: line-through;
-      }
+      margin-bottom: 0.375rem;
     }
 
     .task-title {
@@ -373,8 +480,87 @@ import cytoscape from 'cytoscape';
       font-size: 0.9rem;
       margin: 0;
       flex: 1;
+      line-height: 1.4;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .task-desc {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .no-tasks,
+    .tasks-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 1rem;
+      text-align: center;
+      color: var(--text-muted);
+      gap: 0.75rem;
+    }
+
+    .no-tasks-icon {
+      font-size: 2.5rem;
+      opacity: 0.5;
+    }
+
+    .no-tasks p {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    /* Loading */
+    .loading-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+    }
+
+    /* Modal Actions */
+    .modal-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .goal-header {
+        flex-direction: column;
+      }
+
+      .goal-header-actions {
+        width: 100%;
+        justify-content: flex-end;
+      }
+
+      .task-panel.open {
+        width: 100%;
+        max-width: 400px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .breadcrumb {
+        padding: 0.75rem 1rem;
+      }
+
+      .goal-header {
+        padding: 1rem;
+      }
+
+      .task-panel.open {
+        max-width: 100%;
+      }
+
+      .layout {
+        height: calc(100vh - 180px);
+      }
+    }
   `]
 })
 export class SkillTreeComponent implements OnInit, OnDestroy {
@@ -385,10 +571,12 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
   private api = inject(ApiService);
 
   loading = signal(true);
+  currentGoal = signal<Goal | null>(null);
   selectedSkill = signal<Skill | null>(null);
   tasks = signal<LearningTask[]>([]);
   tasksLoading = signal(false);
   regeneratingTasks = signal(false);
+  showRegenerateModal = signal(false);
 
   private cy: any = null;
   private goalId = '';
@@ -396,11 +584,38 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.goalId = this.route.snapshot.paramMap.get('goalId') ?? '';
-    this.loadSkillTree();
+    this.loadGoalAndSkillTree();
   }
 
   ngOnDestroy() {
     this.cy?.destroy();
+  }
+
+  loadGoalAndSkillTree() {
+    // Load goal first
+    this.api.getGoals().subscribe({
+      next: (goals) => {
+        const goal = goals.find(g => g.id === this.goalId);
+        this.currentGoal.set(goal || null);
+        
+        // Then load skills
+        this.loadSkillTree();
+      },
+      error: () => {
+        this.loadSkillTree(); // Continue even if goal fetch fails
+      }
+    });
+  }
+
+  loadSkillTree() {
+    this.api.getSkills(this.goalId).subscribe({
+      next: skills => {
+        this.allSkills = skills;
+        this.loading.set(false);
+        setTimeout(() => this.initCytoscape(skills), 50);
+      },
+      error: () => this.loading.set(false)
+    });
   }
 
   goBack() {
@@ -420,33 +635,41 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     }
   }
 
-  /**
-   * NEW: Check if a task can be toggled
-   * Returns false if:
-   * - Skill is locked
-   * - Skill is completed (can't change tasks of completed skills)
-   */
+  getStatusBadgeVariant(status: string): BadgeVariant {
+    const map: Record<string, BadgeVariant> = {
+      'Draft': 'draft',
+      'Active': 'active',
+      'Completed': 'completed',
+      'Archived': 'archived'
+    };
+    return map[status] || 'info';
+  }
+
+  getSkillStatusBadgeVariant(status: string): BadgeVariant {
+    const map: Record<string, BadgeVariant> = {
+      'Locked': 'locked',
+      'Available': 'available',
+      'InProgress': 'in-progress',
+      'Completed': 'completed'
+    };
+    return map[status] || 'info';
+  }
+
+  getEarnedXP(): number {
+    return this.tasks()
+      .filter(t => t.status === 'Completed')
+      .reduce((sum, t) => sum + t.experiencePoints, 0);
+  }
+
   canToggleTask(task: LearningTask): boolean {
     const skill = this.selectedSkill();
     if (!skill) return false;
 
-    // Can't toggle tasks if skill is locked or completed
     if (skill.status === 'Locked' || task.status === 'Completed') {
       return false;
     }
 
     return true;
-  }
-
-  loadSkillTree() {
-    this.api.getSkills(this.goalId).subscribe({
-      next: skills => {
-        this.allSkills = skills;
-        this.loading.set(false);
-        setTimeout(() => this.initCytoscape(skills), 50);
-      },
-      error: () => this.loading.set(false)
-    });
   }
 
   initCytoscape(skills: Skill[]) {
@@ -458,10 +681,10 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     if (!this.cyContainer) return;
 
     const statusColors: Record<string, string> = {
-      Locked:     '#374151',
-      Available:  '#1d4ed8',
+      Locked: '#374151',
+      Available: '#1d4ed8',
       InProgress: '#d97706',
-      Completed:  '#059669',
+      Completed: '#059669',
     };
 
     const nodes = skills.map(s => ({
@@ -546,9 +769,6 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
 
     this.cy.on('tap', 'node', (evt: any) => {
       const skill: Skill = evt.target.data('skill');
-      
-
-
       this.selectedSkill.set(skill);
       this.loadTasks(skill);
     });
@@ -565,7 +785,6 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     this.tasks.set([]);
     this.api.getTasks(this.goalId, skill.id).subscribe({
       next: tasks => {
-        console.log(`Loaded ${tasks.length} tasks for skill ${skill.name}`);
         this.tasks.set(tasks);
         this.tasksLoading.set(false);
       },
@@ -578,33 +797,21 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
 
   toggleTaskStatus(task: LearningTask) {
     const currentSkill = this.selectedSkill();
-    if (!currentSkill) return;
-
-    // NEW: Check if task can be toggled
-    if (!this.canToggleTask(task)) {
-      console.log('Cannot toggle task - skill is locked or completed');
-      return;
-    }
+    if (!currentSkill || !this.canToggleTask(task)) return;
 
     let nextStatus: string | null = null;
 
     if (task.status === 'NotStarted') {
       nextStatus = 'InProgress';
-    }
-    else if (task.status === 'InProgress') {
+    } else if (task.status === 'InProgress') {
       nextStatus = 'Completed';
     }
-    else if (task.status === 'Completed') {
-      nextStatus = null; // Cannot go backwards
-    }
 
-    // Stop if no valid next step
     if (!nextStatus) return;
-
 
     this.api.updateTaskStatus(this.goalId, currentSkill.id, task.id, nextStatus).subscribe({
       next: updatedTask => {
-        this.tasks.update(tasks => 
+        this.tasks.update(tasks =>
           tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
         );
 
@@ -618,16 +825,15 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     });
   }
 
-  regenerateTasks() {
+  confirmRegenerateTasks() {
     const skill = this.selectedSkill();
     if (!skill) return;
 
+    this.showRegenerateModal.set(false);
     this.regeneratingTasks.set(true);
-    
-    // Call a new API endpoint to regenerate tasks for this specific skill
+
     this.api.regenerateTasksForSkill(this.goalId, skill.id).subscribe({
       next: (newTasks) => {
-        console.log(`Regenerated ${newTasks.length} tasks for ${skill.name}`);
         this.tasks.set(newTasks);
         this.regeneratingTasks.set(false);
       },

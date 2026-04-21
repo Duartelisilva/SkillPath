@@ -5,10 +5,27 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { Goal } from '../../models/goal.model';
 
+// Import new components
+import { ButtonComponent } from '../../shared/components/button/button';
+import { CardComponent } from '../../shared/components/card/card';
+import { BadgeComponent, BadgeVariant } from '../../shared/components/badge/badge';
+import { ModalComponent } from '../../shared/components/modal/modal';
+import { SpinnerComponent } from '../../shared/components/spinner/spinner';
+import { ProgressBarComponent } from '../../shared/components/progress-bar/progress-bar';
+
 @Component({
   selector: 'app-goals',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    ButtonComponent,
+    CardComponent,
+    BadgeComponent,
+    ModalComponent,
+    SpinnerComponent,
+    ProgressBarComponent
+  ],
   template: `
     <div class="goals-page">
       <header class="page-header">
@@ -19,91 +36,228 @@ import { Goal } from '../../models/goal.model';
           </div>
           <p class="subtitle">Your AI-powered learning journey</p>
         </div>
-        <button class="btn btn-primary" (click)="showModal = true">
+        <app-button
+          variant="primary"
+          size="lg"
+          (clicked)="showCreateModal.set(true)"
+        >
           + New Goal
-        </button>
+        </app-button>
       </header>
 
+      <!-- Stats Section (NEW!) -->
+      <section class="stats-section" *ngIf="!loading()">
+        <app-card variant="elevated" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon">🎯</div>
+            <div class="stat-details">
+              <p class="stat-label">Total Goals</p>
+              <p class="stat-value">{{ goals().length }}</p>
+            </div>
+          </div>
+        </app-card>
+
+        <app-card variant="elevated" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon">📚</div>
+            <div class="stat-details">
+              <p class="stat-label">Active Skills</p>
+              <p class="stat-value">{{ getTotalSkills() }}</p>
+            </div>
+          </div>
+        </app-card>
+
+        <app-card variant="elevated" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon">✓</div>
+            <div class="stat-details">
+              <p class="stat-label">Active Goals</p>
+              <p class="stat-value">{{ getActiveGoalsCount() }}</p>
+            </div>
+          </div>
+        </app-card>
+      </section>
+
+      <!-- Goals Grid -->
       <main class="goals-grid" *ngIf="!loading()">
-        <div class="goal-card" *ngFor="let goal of goals()" (click)="openGoal(goal)">
-          <div class="card-header">
-            <span class="status-badge {{ goal.status }}">{{ goal.status }}</span>
+        <app-card
+          *ngFor="let goal of goals()"
+          [clickable]="true"
+          [hasHeader]="true"
+          [hasFooter]="true"
+          (cardClicked)="openGoal(goal)"
+          class="goal-card-wrapper"
+        >
+          <!-- Header -->
+          <div card-header class="goal-card-header">
+            <app-badge
+              [variant]="getStatusBadgeVariant(goal.status)"
+              size="sm"
+            >
+              {{ goal.status }}
+            </app-badge>
             <span class="skill-count">{{ getSkillCount(goal) }} skills</span>
           </div>
-          <h2 class="card-title">{{ goal.title }}</h2>
-          <p class="card-desc">{{ goal.description }}</p>
-          <div class="card-footer">
-            <button class="btn btn-primary generate-btn"
-              (click)="generateTree($event, goal)"
-              [disabled]="generating() === goal.id">
-              {{ generating() === goal.id ? '⚙ Generating...' : '🤖 Generate Skill Tree' }}
-            </button>
-          </div>
-        </div>
 
-        <div class="goal-card empty-card" *ngIf="goals().length === 0">
-          <span class="empty-icon">🎯</span>
-          <p>No goals yet. Create your first learning goal!</p>
-        </div>
+          <!-- Body -->
+          <div class="goal-card-body">
+            <h2 class="goal-title">{{ goal.title }}</h2>
+            <p class="goal-description">{{ goal.description }}</p>
+            
+            <!-- Progress indicator (NEW!) -->
+            <div class="goal-progress" *ngIf="getSkillCount(goal) > 0">
+              <app-progress-bar
+                [current]="getSkillCount(goal)"
+                [max]="getSkillCount(goal)"
+                label="Skills Generated"
+                [showValue]="false"
+                [showPercentage]="false"
+                variant="xp"
+                size="sm"
+              />
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div card-footer class="goal-card-footer">
+            <app-button
+              variant="primary"
+              size="sm"
+              [fullWidth]="true"
+              [loading]="generating() === goal.id"
+              [disabled]="generating() === goal.id"
+              (clicked)="handleGenerateClick($event, goal)"
+            >
+              {{ getSkillCount(goal) > 0 ? '🔄 Regenerate Skills' : '🤖 Generate Skill Tree' }}
+            </app-button>
+          </div>
+        </app-card>
+
+        <!-- Empty State -->
+        <app-card *ngIf="goals().length === 0" class="empty-card">
+          <div class="empty-content">
+            <span class="empty-icon">🎯</span>
+            <h3>No goals yet</h3>
+            <p>Create your first learning goal to get started!</p>
+            <app-button
+              variant="primary"
+              (clicked)="showCreateModal.set(true)"
+            >
+              Create Your First Goal
+            </app-button>
+          </div>
+        </app-card>
       </main>
 
-      <div class="loading" *ngIf="loading()">
-        <div class="spinner"></div>
-        <p>Loading goals...</p>
+      <!-- Loading State -->
+      <div class="loading-container" *ngIf="loading()">
+        <app-spinner size="xl" variant="primary" text="Loading your goals..." />
       </div>
 
       <!-- Create Goal Modal -->
-      <div class="modal-overlay" *ngIf="showModal" (click)="showModal = false">
-        <div class="modal" (click)="$event.stopPropagation()">
-          <h2>Create New Goal</h2>
+      <app-modal
+        [isOpen]="showCreateModal()"
+        size="md"
+        [hasFooter]="true"
+        (closed)="closeCreateModal()"
+        ariaLabelledBy="create-goal-title"
+      >
+        <h2 modal-header id="create-goal-title">Create New Goal</h2>
+        
+        <div class="modal-form">
           <div class="form-group">
-            <label>Title</label>
-            <input [(ngModel)]="newTitle" placeholder="e.g. Learn C#" maxlength="200" />
+            <label for="goal-title">Title</label>
+            <input
+              id="goal-title"
+              [(ngModel)]="newTitle"
+              placeholder="e.g. Learn C#"
+              maxlength="200"
+              (keyup.enter)="createGoal()"
+            />
           </div>
           <div class="form-group">
-            <label>Description</label>
-            <textarea [(ngModel)]="newDescription" placeholder="What do you want to achieve?" rows="4" maxlength="2000"></textarea>
-          </div>
-          <div class="modal-actions">
-            <button class="btn btn-secondary" (click)="showModal = false">Cancel</button>
-            <button class="btn btn-primary" (click)="createGoal()" [disabled]="!newTitle || !newDescription">
-              Create Goal
-            </button>
+            <label for="goal-description">Description</label>
+            <textarea
+              id="goal-description"
+              [(ngModel)]="newDescription"
+              placeholder="What do you want to achieve?"
+              rows="4"
+              maxlength="2000"
+            ></textarea>
           </div>
         </div>
-      </div>
+
+        <div modal-footer class="modal-actions">
+          <app-button
+            variant="secondary"
+            (clicked)="closeCreateModal()"
+          >
+            Cancel
+          </app-button>
+          <app-button
+            variant="primary"
+            [disabled]="!newTitle.trim() || !newDescription.trim()"
+            (clicked)="createGoal()"
+          >
+            Create Goal
+          </app-button>
+        </div>
+      </app-modal>
 
       <!-- Generation Progress Modal -->
-      <div class="modal-overlay" *ngIf="generating()" (click)="$event.stopPropagation()">
-        <div class="modal progress-modal" (click)="$event.stopPropagation()">
-          <div class="progress-content">
-            <div class="progress-spinner">
-              <div class="spinner-large"></div>
-            </div>
-            <h2>{{ progressTitle() }}</h2>
-            <p class="progress-message">{{ progressMessage() }}</p>
-            <div class="progress-bar">
-              <div class="progress-fill" [style.width.%]="progressPercent()"></div>
-            </div>
-            <p class="progress-hint">This may take 1-2 minutes. Please wait...</p>
+      <app-modal
+        [isOpen]="!!generating()"
+        size="md"
+        [showCloseButton]="false"
+        [closeOnOverlayClick]="false"
+        [closeOnEscape]="false"
+      >
+        <div class="progress-modal-content">
+          <div class="progress-spinner-wrapper">
+            <app-spinner size="xl" variant="primary" />
           </div>
+          <h2>{{ progressTitle() }}</h2>
+          <p class="progress-message">{{ progressMessage() }}</p>
+          <app-progress-bar
+            [current]="progressPercent()"
+            [max]="100"
+            [showLabel]="false"
+            [showValue]="false"
+            variant="xp"
+            size="lg"
+          />
+          <p class="progress-hint">This may take 1-2 minutes. Please wait...</p>
         </div>
-      </div>
+      </app-modal>
 
       <!-- Error Modal -->
-      <div class="modal-overlay" *ngIf="showErrorModal()" (click)="showErrorModal.set(false)">
-        <div class="modal error-modal" (click)="$event.stopPropagation()">
+      <app-modal
+        [isOpen]="showErrorModal()"
+        size="md"
+        [hasFooter]="true"
+        (closed)="showErrorModal.set(false)"
+      >
+        <div class="error-modal-content">
           <div class="error-icon">⚠️</div>
-          <h2>Generation Failed</h2>
+          <h2 modal-header>Generation Failed</h2>
           <p class="error-message">{{ errorMessage() }}</p>
-          <div class="modal-actions">
-            <button class="btn btn-secondary" (click)="showErrorModal.set(false)">Cancel</button>
-            <button class="btn btn-primary" (click)="retryGeneration()">
-              🔄 Try Again
-            </button>
-          </div>
         </div>
-      </div>
+
+        <div modal-footer class="modal-actions">
+          <app-button
+            variant="secondary"
+            (clicked)="showErrorModal.set(false)"
+          >
+            Cancel
+          </app-button>
+          <app-button
+            variant="primary"
+            (clicked)="retryGeneration()"
+          >
+            🔄 Try Again
+          </app-button>
+        </div>
+      </app-modal>
     </div>
   `,
   styles: [`
@@ -117,7 +271,7 @@ import { Goal } from '../../models/goal.model';
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 3rem;
+      margin-bottom: 2rem;
       padding-bottom: 1.5rem;
       border-bottom: 1px solid var(--border-accent);
     }
@@ -139,42 +293,76 @@ import { Goal } from '../../models/goal.model';
       background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      margin: 0;
     }
 
     .subtitle {
       color: var(--text-secondary);
       font-size: 0.9rem;
-      margin-top: 0.25rem;
+      margin: 0.25rem 0 0 0;
     }
 
+    /* Stats Section */
+    .stats-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(6, 182, 212, 0.1));
+    }
+
+    .stat-content {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .stat-icon {
+      font-size: 2.5rem;
+      flex-shrink: 0;
+    }
+
+    .stat-details {
+      flex: 1;
+    }
+
+    .stat-label {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0 0 0.25rem 0;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      font-family: 'Rajdhani', sans-serif;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 0;
+    }
+
+    /* Goals Grid */
     .goals-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 1.5rem;
     }
 
-    .goal-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border-accent);
-      border-radius: 16px;
-      padding: 1.5rem;
-      cursor: pointer;
+    .goal-card-wrapper {
       transition: all 0.3s ease;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-
-      &:hover {
-        border-color: var(--accent-purple);
-        transform: translateY(-4px);
-        box-shadow: 0 8px 30px rgba(124, 58, 237, 0.2);
-      }
     }
 
-    .card-header {
+    .goal-card-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      width: 100%;
     }
 
     .skill-count {
@@ -182,175 +370,83 @@ import { Goal } from '../../models/goal.model';
       font-size: 0.8rem;
     }
 
-    .card-title {
-      font-size: 1.5rem;
-      color: var(--text-primary);
+    .goal-card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
     }
 
-    .card-desc {
+    .goal-title {
+      font-size: 1.5rem;
+      color: var(--text-primary);
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    .goal-description {
       color: var(--text-secondary);
       font-size: 0.9rem;
       line-height: 1.6;
-      flex: 1;
+      margin: 0;
       display: -webkit-box;
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
 
-    .card-footer {
+    .goal-progress {
       margin-top: 0.5rem;
     }
 
-    .generate-btn {
+    .goal-card-footer {
       width: 100%;
-      justify-content: center;
     }
 
+    /* Empty State */
     .empty-card {
+      grid-column: 1 / -1;
+      border-style: dashed;
+    }
+
+    .empty-content {
+      display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 200px;
-      border-style: dashed;
-      cursor: default;
-
-      &:hover {
-        transform: none;
-        box-shadow: none;
-      }
-
-      .empty-icon {
-        font-size: 3rem;
-        margin-bottom: 1rem;
-      }
-
-      p {
-        color: var(--text-muted);
-      }
+      text-align: center;
+      padding: 3rem 2rem;
+      gap: 1rem;
     }
 
-    .loading {
+    .empty-icon {
+      font-size: 4rem;
+      opacity: 0.5;
+    }
+
+    .empty-content h3 {
+      font-size: 1.5rem;
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .empty-content p {
+      color: var(--text-muted);
+      margin: 0 0 1rem 0;
+    }
+
+    /* Loading */
+    .loading-container {
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
       min-height: 50vh;
-      gap: 1rem;
-      color: var(--text-secondary);
     }
 
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid var(--border-accent);
-      border-top-color: var(--accent-purple);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      backdrop-filter: blur(4px);
-    }
-
-    .modal {
-      background: var(--bg-card);
-      border: 1px solid var(--border-accent);
-      border-radius: 16px;
-      padding: 2rem;
-      width: 100%;
-      max-width: 480px;
+    /* Modal Forms */
+    .modal-form {
       display: flex;
       flex-direction: column;
       gap: 1.5rem;
-
-      h2 {
-        font-size: 1.75rem;
-        background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin: 0;
-      }
-    }
-
-    .progress-modal, .error-modal {
-      max-width: 520px;
-    }
-
-    .progress-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1.5rem;
-    }
-
-    .progress-spinner {
-      margin-bottom: 0.5rem;
-    }
-
-    .spinner-large {
-      width: 64px;
-      height: 64px;
-      border: 4px solid var(--border-accent);
-      border-top-color: var(--accent-purple);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    .progress-message {
-      color: var(--text-primary);
-      font-size: 1.1rem;
-      text-align: center;
-      margin: 0;
-    }
-
-    .progress-bar {
-      width: 100%;
-      height: 8px;
-      background: var(--bg-secondary);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan));
-      transition: width 0.5s ease;
-      border-radius: 4px;
-    }
-
-    .progress-hint {
-      color: var(--text-muted);
-      font-size: 0.85rem;
-      text-align: center;
-      margin: 0;
-    }
-
-    .error-modal {
-      text-align: center;
-    }
-
-    .error-icon {
-      font-size: 4rem;
-      margin-bottom: 1rem;
-    }
-
-    .error-message {
-      color: var(--text-secondary);
-      font-size: 1rem;
-      line-height: 1.6;
-      margin: 0;
     }
 
     .form-group {
@@ -391,6 +487,85 @@ import { Goal } from '../../models/goal.model';
       gap: 1rem;
       justify-content: flex-end;
     }
+
+    /* Progress Modal */
+    .progress-modal-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      text-align: center;
+      padding: 1rem 0;
+    }
+
+    .progress-spinner-wrapper {
+      margin-bottom: 0.5rem;
+    }
+
+    .progress-modal-content h2 {
+      font-size: 1.75rem;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin: 0;
+    }
+
+    .progress-message {
+      color: var(--text-primary);
+      font-size: 1.1rem;
+      margin: 0;
+    }
+
+    .progress-hint {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin: 0;
+    }
+
+    /* Error Modal */
+    .error-modal-content {
+      text-align: center;
+    }
+
+    .error-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+
+    .error-modal-content h2 {
+      font-size: 1.75rem;
+      color: var(--accent-red);
+      margin: 0 0 1rem 0;
+    }
+
+    .error-message {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      line-height: 1.6;
+      white-space: pre-line;
+      margin: 0;
+    }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      .goals-page {
+        padding: 1rem;
+      }
+
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+
+      .stats-section {
+        grid-template-columns: 1fr;
+      }
+
+      .goals-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   `]
 })
 export class GoalsComponent implements OnInit, OnDestroy {
@@ -400,7 +575,7 @@ export class GoalsComponent implements OnInit, OnDestroy {
   progressTitle = signal('Generating Skill Tree');
   progressMessage = signal('Initializing AI model...');
   progressPercent = signal(0);
-  showModal = false;
+  showCreateModal = signal(false);
   showErrorModal = signal(false);
   errorMessage = signal('');
   newTitle = '';
@@ -435,25 +610,51 @@ export class GoalsComponent implements OnInit, OnDestroy {
     return goal.skillCount ?? 0;
   }
 
+  getTotalSkills(): number {
+    return this.goals().reduce((sum, goal) => sum + this.getSkillCount(goal), 0);
+  }
+
+  getActiveGoalsCount(): number {
+    return this.goals().filter(g => g.status === 'Active').length;
+  }
+
+  getStatusBadgeVariant(status: string): BadgeVariant {
+    const statusMap: Record<string, BadgeVariant> = {
+      'Draft': 'draft',
+      'Active': 'active',
+      'Completed': 'completed',
+      'Archived': 'archived'
+    };
+    return statusMap[status] || 'info';
+  }
+
   openGoal(goal: Goal) {
     this.router.navigate(['/goals', goal.id, 'skill-tree']);
   }
 
+  closeCreateModal() {
+    this.showCreateModal.set(false);
+    this.newTitle = '';
+    this.newDescription = '';
+  }
+
   createGoal() {
-    if (!this.newTitle || !this.newDescription) return;
+    if (!this.newTitle.trim() || !this.newDescription.trim()) return;
 
     this.api.createGoal(this.newTitle, this.newDescription).subscribe({
       next: goal => {
         this.goals.update(goals => [...goals, goal]);
-        this.showModal = false;
-        this.newTitle = '';
-        this.newDescription = '';
+        this.closeCreateModal();
       }
     });
   }
 
-  generateTree(event: Event, goal: Goal) {
+  handleGenerateClick(event: Event, goal: Goal) {
     event.stopPropagation();
+    this.generateTree(goal);
+  }
+
+  generateTree(goal: Goal) {
     this.currentGoalId = goal.id;
     this.generating.set(goal.id);
     this.progressTitle.set('Generating Skill Tree');
@@ -479,8 +680,7 @@ export class GoalsComponent implements OnInit, OnDestroy {
     if (this.currentGoalId) {
       const goal = this.goals().find(g => g.id === this.currentGoalId);
       if (goal) {
-        // Simulate a click event
-        this.generateTree(new Event('click'), goal);
+        this.generateTree(goal);
       }
     }
   }

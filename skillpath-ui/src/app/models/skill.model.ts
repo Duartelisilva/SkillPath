@@ -8,4 +8,5 @@ export interface Skill {
   createdAtUtc: string;
   updatedAtUtc: string | null;
   dependsOn: string[];
+  requiredExperiencePoints: number;
 }
