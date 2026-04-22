@@ -656,9 +656,12 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
   }
 
   getEarnedXP(): number {
-    return this.tasks()
+    const earned = this.tasks()
       .filter(t => t.status === 'Completed')
       .reduce((sum, t) => sum + t.experiencePoints, 0);
+    
+    const required = this.selectedSkill()?.requiredExperiencePoints || 100;
+    return Math.min(earned, required);
   }
 
   canToggleTask(task: LearningTask): boolean {

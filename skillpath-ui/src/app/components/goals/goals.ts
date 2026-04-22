@@ -104,6 +104,40 @@ import { ProgressBarComponent } from '../../shared/components/progress-bar/progr
             <h2 class="goal-title">{{ goal.title }}</h2>
             <p class="goal-description">{{ goal.description }}</p>
             
+            <!-- Generation Status UI -->
+            <div class="generation-status"
+                *ngIf="getGenerationStatus(goal.id) as genStatus">
+
+              <div class="status-text" [ngClass]="genStatus">
+                <span *ngIf="genStatus === 'generating'">
+                  ⚙ Generating Skills...
+                </span>
+
+                <span *ngIf="genStatus === 'success'">
+                  ✓ Skills Generated
+                </span>
+
+                <span *ngIf="genStatus === 'failed'">
+                  ✕ Failed to Generate Skills
+                </span>
+              </div>
+
+              <div class="status-bar">
+                <div class="status-fill"
+                    [style.width.%]="getGenerationProgress(goal.id)">
+                </div>
+              </div>
+
+            </div>
+
+            <!-- No skills message -->
+            <div class="no-skills-message"
+                *ngIf="!getGenerationStatus(goal.id) && getSkillCount(goal) === 0">
+
+              📋 No skills yet
+
+            </div>
+
             <!-- Progress indicator (NEW!) -->
             <div class="goal-progress" *ngIf="getSkillCount(goal) > 0">
               <app-progress-bar
@@ -205,30 +239,40 @@ import { ProgressBarComponent } from '../../shared/components/progress-bar/progr
       </app-modal>
 
       <!-- Generation Progress Modal -->
-      <app-modal
-        [isOpen]="!!generating()"
-        size="md"
-        [showCloseButton]="false"
-        [closeOnOverlayClick]="false"
-        [closeOnEscape]="false"
-      >
-        <div class="progress-modal-content">
-          <div class="progress-spinner-wrapper">
-            <app-spinner size="xl" variant="primary" />
+        <app-modal
+          [isOpen]="!!generating()"
+          size="md"
+          [showCloseButton]="true"
+          [closeOnOverlayClick]="true"
+          [closeOnEscape]="true"
+          (closed)="cancelGeneration()"
+        >
+          <div class="progress-modal-content">
+            <div class="progress-spinner-wrapper">
+              <app-spinner size="xl" variant="primary" />
+            </div>
+
+            <h2>{{ progressTitle() }}</h2>
+
+            <p class="progress-message">
+              {{ progressMessage() }}
+            </p>
+
+            <app-progress-bar
+              [current]="progressPercent()"
+              [max]="100"
+              [showLabel]="false"
+              [showValue]="false"
+              variant="xp"
+              size="lg"
+            />
+
+            <p class="progress-hint">
+              This may take 1–2 minutes. Generation continues in background.
+            </p>
           </div>
-          <h2>{{ progressTitle() }}</h2>
-          <p class="progress-message">{{ progressMessage() }}</p>
-          <app-progress-bar
-            [current]="progressPercent()"
-            [max]="100"
-            [showLabel]="false"
-            [showValue]="false"
-            variant="xp"
-            size="lg"
-          />
-          <p class="progress-hint">This may take 1-2 minutes. Please wait...</p>
-        </div>
-      </app-modal>
+        </app-modal>
+
 
       <!-- Error Modal -->
       <app-modal
@@ -566,6 +610,72 @@ import { ProgressBarComponent } from '../../shared/components/progress-bar/progr
         grid-template-columns: 1fr;
       }
     }
+
+    .generation-status {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      border-radius: 8px;
+      background: var(--bg-secondary);
+    }
+    
+    .status-text {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      
+      &.generating { color: var(--accent-blue); }
+      &.success { color: var(--accent-green); }
+      &.failed { color: var(--accent-red); }
+    }
+    
+    .status-bar {
+      height: 4px;
+      background: var(--bg-primary);
+      border-radius: 2px;
+      overflow: hidden;
+      
+      &.failed {
+        background: rgba(239, 68, 68, 0.2);
+      }
+    }
+    
+    .status-fill {
+      height: 100%;
+      transition: width 0.3s ease;
+      border-radius: 2px;
+      
+      .generating & {
+        background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+      }
+      
+      .success & {
+        background: var(--accent-green);
+      }
+      
+      .failed & {
+        background: var(--accent-red);
+      }
+    }
+    
+    .no-skills-message {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem;
+      margin-top: 0.75rem;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+    
+    .no-skills-icon {
+      font-size: 1.25rem;
+      opacity: 0.6;
+    }
   `]
 })
 export class GoalsComponent implements OnInit, OnDestroy {
@@ -629,6 +739,8 @@ export class GoalsComponent implements OnInit, OnDestroy {
   }
 
   openGoal(goal: Goal) {
+    // Clear generation state when opening a goal
+    this.generationStates.delete(goal.id);
     this.router.navigate(['/goals', goal.id, 'skill-tree']);
   }
 
@@ -657,19 +769,40 @@ export class GoalsComponent implements OnInit, OnDestroy {
   generateTree(goal: Goal) {
     this.currentGoalId = goal.id;
     this.generating.set(goal.id);
+    
+    // Set generation state
+    this.generationStates.set(goal.id, {
+      status: 'generating',
+      progress: 0
+    });
+    
     this.progressTitle.set('Generating Skill Tree');
-    this.startProgressSimulation();
-
+    this.startProgressSimulation(goal.id);
+  
     this.api.generateSkillTree(goal.id).subscribe({
       next: () => {
         this.stopProgressSimulation();
         this.generating.set(null);
+        
+        // Update state to success
+        this.generationStates.set(goal.id, {
+          status: 'success',
+          progress: 100
+        });
+        
+        this.loadGoals(); // Refresh to show new skill count
         this.currentGoalId = null;
-        this.router.navigate(['/goals', goal.id, 'skill-tree']);
       },
       error: (err) => {
         this.stopProgressSimulation();
         this.generating.set(null);
+        
+        // Update state to failed
+        this.generationStates.set(goal.id, {
+          status: 'failed',
+          progress: 0
+        });
+        
         this.handleGenerationError(err);
       }
     });
@@ -685,6 +818,11 @@ export class GoalsComponent implements OnInit, OnDestroy {
     }
   }
 
+  cancelGeneration() {
+    // Just hide modal
+    this.generating.set(null);
+  }
+
   private handleGenerationError(error: any) {
     console.error('Generation error:', error);
     
@@ -698,7 +836,7 @@ export class GoalsComponent implements OnInit, OnDestroy {
     this.showErrorModal.set(true);
   }
 
-  private startProgressSimulation() {
+  private startProgressSimulation(goalId: string) {
     const messages = [
       'Initializing AI model...',
       'Analyzing your learning goal...',
@@ -707,18 +845,24 @@ export class GoalsComponent implements OnInit, OnDestroy {
       'Building skill dependencies...',
       'Finalizing skill tree...'
     ];
-
+  
     let messageIndex = 0;
     let currentProgress = 0;
-
+  
     this.progressMessage.set(messages[0]);
     this.progressPercent.set(0);
-
+  
     this.progressInterval = setInterval(() => {
       const increment = currentProgress < 50 ? 3 : currentProgress < 80 ? 1.5 : 0.5;
       currentProgress = Math.min(95, currentProgress + increment);
       this.progressPercent.set(currentProgress);
-
+      
+      // Update the generation state
+      const state = this.generationStates.get(goalId);
+      if (state) {
+        state.progress = currentProgress;
+      }
+  
       const newMessageIndex = Math.floor((currentProgress / 95) * messages.length);
       if (newMessageIndex !== messageIndex && newMessageIndex < messages.length) {
         messageIndex = newMessageIndex;
@@ -733,5 +877,31 @@ export class GoalsComponent implements OnInit, OnDestroy {
     }
     this.progressPercent.set(100);
     this.progressMessage.set('Complete!');
+  }
+
+  private generationStates = new Map<string, {
+    status: 'generating' | 'success' | 'failed' | null;
+    progress: number;
+  }>();
+
+  getGenerationStatus(goalId: string): 'generating' | 'success' | 'failed' | null {
+  return this.generationStates.get(goalId)?.status || null;
+  }
+  
+  getGenerationProgress(goalId: string): number {
+    return this.generationStates.get(goalId)?.progress || 0;
+  }
+  
+  shouldShowGenerationUI(goal: Goal): boolean {
+    const state = this.generationStates.get(goal.id);
+    if (!state) return false;
+    
+    // Hide after user navigates away or reloads
+    if (state.status === 'success' || state.status === 'failed') {
+      // Check if user has interacted since completion
+      return false; // Implement interaction tracking if needed
+    }
+    
+    return true;
   }
 }
