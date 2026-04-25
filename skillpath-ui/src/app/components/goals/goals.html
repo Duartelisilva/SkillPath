@@ -1,0 +1,276 @@
+    <div class="goals-page">
+      <header class="page-header">
+        <div class="header-content">
+          <div class="logo">
+            <span class="logo-icon">⚡</span>
+            <h1>SkillPath</h1>
+          </div>
+          <p class="subtitle">Your AI-powered learning journey</p>
+        </div>
+        <app-button
+          variant="primary"
+          size="lg"
+          (clicked)="showCreateModal.set(true)"
+        >
+          + New Goal
+        </app-button>
+      </header>
+
+      <!-- Stats Section (NEW!) -->
+      <section class="stats-section" *ngIf="!loading()">
+        <app-card variant="elevated" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon">🎯</div>
+            <div class="stat-details">
+              <p class="stat-label">Total Goals</p>
+              <p class="stat-value">{{ goals().length }}</p>
+            </div>
+          </div>
+        </app-card>
+
+        <app-card variant="elevated" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon">📚</div>
+            <div class="stat-details">
+              <p class="stat-label">Active Skills</p>
+              <p class="stat-value">{{ getTotalSkills() }}</p>
+            </div>
+          </div>
+        </app-card>
+
+        <app-card variant="elevated" class="stat-card">
+          <div class="stat-content">
+            <div class="stat-icon">✓</div>
+            <div class="stat-details">
+              <p class="stat-label">Active Goals</p>
+              <p class="stat-value">{{ getActiveGoalsCount() }}</p>
+            </div>
+          </div>
+        </app-card>
+      </section>
+
+      <!-- Goals Grid -->
+      <main class="goals-grid" *ngIf="!loading()">
+        <app-card
+          *ngFor="let goal of goals()"
+          [clickable]="true"
+          [hasHeader]="true"
+          [hasFooter]="true"
+          (cardClicked)="openGoal(goal)"
+          class="goal-card-wrapper"
+        >
+          <!-- Header -->
+          <div card-header class="goal-card-header">
+            <app-badge
+              [variant]="getStatusBadgeVariant(goal.status)"
+              size="sm"
+            >
+              {{ goal.status }}
+            </app-badge>
+            <span class="skill-count">{{ getSkillCount(goal) }} skills</span>
+          </div>
+
+          <!-- Body -->
+          <div class="goal-card-body">
+            <h2 class="goal-title">{{ goal.title }}</h2>
+            <p class="goal-description">{{ goal.description }}</p>
+            
+            <!-- Generation Status UI -->
+            <div class="generation-status"
+                *ngIf="getGenerationStatus(goal.id) as genStatus">
+
+              <div class="status-text" [ngClass]="genStatus">
+                <span *ngIf="genStatus === 'generating'">
+                  ⚙ Generating Skills...
+                </span>
+
+                <span *ngIf="genStatus === 'success'">
+                  ✓ Skills Generated
+                </span>
+
+                <span *ngIf="genStatus === 'failed'">
+                  ✕ Failed to Generate Skills
+                </span>
+              </div>
+
+              <div class="status-bar">
+                <div class="status-fill"
+                    [style.width.%]="getGenerationProgress(goal.id)">
+                </div>
+              </div>
+
+            </div>
+
+            <!-- No skills message -->
+            <div class="no-skills-message"
+                *ngIf="!getGenerationStatus(goal.id) && getSkillCount(goal) === 0">
+
+              📋 No skills yet
+
+            </div>
+
+            <!-- Progress indicator (NEW!) -->
+            <div class="goal-progress" *ngIf="getSkillCount(goal) > 0">
+              <app-progress-bar
+                [current]="getSkillCount(goal)"
+                [max]="getSkillCount(goal)"
+                label="Skills Generated"
+                [showValue]="false"
+                [showPercentage]="false"
+                variant="xp"
+                size="sm"
+              />
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div card-footer class="goal-card-footer">
+            <app-button
+              variant="primary"
+              size="sm"
+              [fullWidth]="true"
+              [loading]="generating() === goal.id"
+              [disabled]="generating() === goal.id"
+              (clicked)="handleGenerateClick($event, goal)"
+            >
+              {{ getSkillCount(goal) > 0 ? '🔄 Regenerate Skills' : '🤖 Generate Skill Tree' }}
+            </app-button>
+          </div>
+        </app-card>
+
+        <!-- Empty State -->
+        <app-card *ngIf="goals().length === 0" class="empty-card">
+          <div class="empty-content">
+            <span class="empty-icon">🎯</span>
+            <h3>No goals yet</h3>
+            <p>Create your first learning goal to get started!</p>
+            <app-button
+              variant="primary"
+              (clicked)="showCreateModal.set(true)"
+            >
+              Create Your First Goal
+            </app-button>
+          </div>
+        </app-card>
+      </main>
+
+      <!-- Loading State -->
+      <div class="loading-container" *ngIf="loading()">
+        <app-spinner size="xl" variant="primary" text="Loading your goals..." />
+      </div>
+
+      <!-- Create Goal Modal -->
+      <app-modal
+        [isOpen]="showCreateModal()"
+        size="md"
+        [hasFooter]="true"
+        (closed)="closeCreateModal()"
+        ariaLabelledBy="create-goal-title"
+      >
+        <h2 modal-header id="create-goal-title">Create New Goal</h2>
+        
+        <div class="modal-form">
+          <div class="form-group">
+            <label for="goal-title">Title</label>
+            <input
+              id="goal-title"
+              [(ngModel)]="newTitle"
+              placeholder="e.g. Learn C#"
+              maxlength="200"
+              (keyup.enter)="createGoal()"
+            />
+          </div>
+          <div class="form-group">
+            <label for="goal-description">Description</label>
+            <textarea
+              id="goal-description"
+              [(ngModel)]="newDescription"
+              placeholder="What do you want to achieve?"
+              rows="4"
+              maxlength="2000"
+            ></textarea>
+          </div>
+        </div>
+
+        <div modal-footer class="modal-actions">
+          <app-button
+            variant="secondary"
+            (clicked)="closeCreateModal()"
+          >
+            Cancel
+          </app-button>
+          <app-button
+            variant="primary"
+            [disabled]="!newTitle.trim() || !newDescription.trim()"
+            (clicked)="createGoal()"
+          >
+            Create Goal
+          </app-button>
+        </div>
+      </app-modal>
+
+      <!-- Generation Progress Modal -->
+        <app-modal
+          [isOpen]="!!generating()"
+          size="md"
+          [showCloseButton]="true"
+          [closeOnOverlayClick]="true"
+          [closeOnEscape]="true"
+          (closed)="cancelGeneration()"
+        >
+          <div class="progress-modal-content">
+            <div class="progress-spinner-wrapper">
+              <app-spinner size="xl" variant="primary" />
+            </div>
+
+            <h2>{{ progressTitle() }}</h2>
+
+            <p class="progress-message">
+              {{ progressMessage() }}
+            </p>
+
+            <app-progress-bar
+              [current]="progressPercent()"
+              [max]="100"
+              [showLabel]="false"
+              [showValue]="false"
+              variant="xp"
+              size="lg"
+            />
+
+            <p class="progress-hint">
+              This may take 1–2 minutes. Generation continues in background.
+            </p>
+          </div>
+        </app-modal>
+
+
+      <!-- Error Modal -->
+      <app-modal
+        [isOpen]="showErrorModal()"
+        size="md"
+        [hasFooter]="true"
+        (closed)="showErrorModal.set(false)"
+      >
+        <div class="error-modal-content">
+          <div class="error-icon">⚠️</div>
+          <h2 modal-header>Generation Failed</h2>
+          <p class="error-message">{{ errorMessage() }}</p>
+        </div>
+
+        <div modal-footer class="modal-actions">
+          <app-button
+            variant="secondary"
+            (clicked)="showErrorModal.set(false)"
+          >
+            Cancel
+          </app-button>
+          <app-button
+            variant="primary"
+            (clicked)="retryGeneration()"
+          >
+            🔄 Try Again
+          </app-button>
+        </div>
+      </app-modal>
+    </div>
