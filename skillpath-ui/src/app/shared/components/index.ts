@@ -5,3 +5,4 @@ export * from './badge/badge';
 export * from './progress-bar/progress-bar';
 export * from './modal/modal';
 export * from './spinner/spinner';
+export * from './generation-settings-modal/generation-settings-modal';

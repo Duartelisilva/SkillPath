@@ -5,6 +5,7 @@ import { Goal } from '../models/goal.model';
 import { Skill } from '../models/skill.model';
 import { LearningTask } from '../models/task.model';
 import { environment } from '../../environments/environment';
+import { GenerationSettings } from '../shared/components/generation-settings-modal/generation-settings-modal';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -32,12 +33,21 @@ export class ApiService {
     return this.http.delete<void>(`${this.baseUrl}/goals/${goalId}`);
   }
 
-  generateSkillTree(goalId: string, additionalContext?: string): Observable<Skill[]> {
-    // Custom header to handle errors in component instead of interceptor
+  generateSkillTree(goalId: string, settings?: GenerationSettings): Observable<Skill[]> {
     const headers = new HttpHeaders().set('X-Skip-Error-Interceptor', 'true');
+    
+    const body = settings ? {
+      additionalContext: settings.additionalContext,
+      minSkills: settings.minSkills,
+      maxSkills: settings.maxSkills,
+      tasksPerSkill: settings.tasksPerSkill,
+      difficulty: settings.difficulty,
+      focus: settings.focus
+    } : {};
+
     return this.http.post<Skill[]>(
       `${this.baseUrl}/goals/${goalId}/generate-skill-tree`, 
-      { additionalContext },
+      body,
       { headers }
     );
   }

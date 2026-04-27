@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using SkillPath.Application.Abstractions.AI;
 using Microsoft.Extensions.Logging;
+using SkillPath.Application.Goals.Commands.GenerateSkillTree;
 
 namespace SkillPath.Infrastructure.AI;
 
@@ -21,59 +22,26 @@ public sealed class OllamaSkillTreeGenerator : ISkillTreeGenerator
     public async Task<IReadOnlyCollection<GeneratedSkill>> GenerateAsync(
         string goalTitle,
         string goalDescription,
-        IReadOnlyCollection<string> existingSkillNames,
+        GenerateSkillTreeCommand parameters,
         CancellationToken cancellationToken)
     {
-        var existingSkillsSection = existingSkillNames.Count > 0
-            ? $"The user already has these skills: {string.Join(", ", existingSkillNames)}. Do not include them."
-            : string.Empty;
+        var systemPrompt = BuildSystemPrompt(parameters);
+        var userPrompt = BuildUserPrompt(goalTitle, goalDescription, parameters);
 
-        var prompt = $$$"""
-            You are a learning path expert. Generate a structured skill tree for the following goal.
-
-            Goal: {{{goalTitle}}}
-            Description: {{{goalDescription}}}
-            {{{existingSkillsSection}}}
-
-            Create a logical progression of skills where later skills build upon earlier ones.
-
-            CRITICAL: Respond ONLY with a valid JSON array. No explanation, no markdown, no code blocks, no extra text.
-            
-            Each item must have exactly these fields:
-            - "name": short skill name (max 200 chars)
-            - "description": what this skill covers (max 1000 chars)
-            - "order": integer starting from 0, representing learning sequence
-
-            IMPORTANT RULES:
-            - Generate exactly 5-7 skills (optimal for learning and performance)
-            - First skill (order 0) should be foundational/basic
-            - Skills should progress from beginner to advanced
-            - Each skill should be clear and actionable
-            - Use simple, direct language
-
-            Return ONLY the JSON array. Example format:
-            [
-              {"name": "Basics", "description": "Foundation concepts", "order": 0},
-              {"name": "Intermediate", "description": "Build on basics", "order": 1}
-            ]
-
-            RESPOND WITH ONLY THE JSON ARRAY NOW:
-            """;
+        var payload = new
+        {
+            model = "mistral",
+            prompt = $"{systemPrompt}\n\n{userPrompt}",
+            stream = false,
+            options = new
+            {
+                temperature = parameters.Difficulty == DifficultyLevel.Advanced ? 0.8 : 0.7,
+                top_p = 0.9
+            }
+        };
 
         try
         {
-            var payload = new
-            {
-                model = "mistral",
-                prompt,
-                stream = false,
-                options = new
-                {
-                    temperature = 0.7,
-                    top_p = 0.9
-                }
-            };
-
             var json = JsonSerializer.Serialize(payload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
@@ -99,7 +67,7 @@ public sealed class OllamaSkillTreeGenerator : ISkillTreeGenerator
 
             // Clean and validate the response
             var cleanedJson = CleanJsonResponse(rawText);
-            
+
             _logger.LogDebug("Cleaned JSON: {Json}", cleanedJson);
 
             // Validate JSON structure before deserializing
@@ -239,5 +207,49 @@ public sealed class OllamaSkillTreeGenerator : ISkillTreeGenerator
     {
         [System.Text.Json.Serialization.JsonPropertyName("response")]
         public string Response { get; init; } = string.Empty;
+    }
+
+    private string BuildSystemPrompt(GenerateSkillTreeCommand parameters)
+    {
+        var basePrompt = @"You are a learning path expert. Generate a structured skill tree for the following goal.
+ 
+            Rules:
+            1. Return ONLY valid JSON, no markdown, no explanations
+            2. Each skill must have: name, description, order
+            3. First skill (order 0) should be foundational";
+
+        var difficultyGuidance = parameters.Difficulty switch
+        {
+            DifficultyLevel.Beginner => "\n- Use simple, foundational concepts\n- Break complex topics into small steps",
+            DifficultyLevel.Advanced => "\n- Focus on advanced concepts and real-world applications\n- Include challenging projects",
+            _ => "\n- Balance theory with practical application\n- Mix foundational and intermediate concepts"
+        };
+
+        var focusGuidance = parameters.Focus switch
+        {
+            TreeFocus.Breadth => $"\n- Create {parameters.MaxSkills} diverse parallel skills\n- Minimize dependencies",
+            TreeFocus.Depth => $"\n- Create {parameters.MinSkills}-{parameters.MinSkills + 3} skills with deep chains\n- Sequential mastery",
+            _ => $"\n- Create {parameters.MinSkills}-{parameters.MaxSkills} skills\n- Mix independent and dependent skills"
+        };
+
+        return $"{basePrompt}{difficultyGuidance}{focusGuidance}";
+    }
+
+    private string BuildUserPrompt(string goalTitle, string goalDescription, GenerateSkillTreeCommand parameters)
+    {
+        var prompt = $@"Goal: {goalTitle}
+            Description: {goalDescription}
+ 
+            Requirements:
+            - Generate {parameters.MinSkills}-{parameters.MaxSkills} skills
+            - Difficulty: {parameters.Difficulty}
+            - Focus: {parameters.Focus}";
+
+        if (!string.IsNullOrWhiteSpace(parameters.AdditionalContext))
+        {
+            prompt += $"\n\nAdditional Context: {parameters.AdditionalContext}";
+        }
+
+        return prompt;
     }
 }

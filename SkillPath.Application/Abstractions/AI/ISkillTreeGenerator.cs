@@ -1,4 +1,6 @@
 ﻿// Abstraction for AI-powered skill tree generation.
+using SkillPath.Application.Goals.Commands.GenerateSkillTree;
+
 namespace SkillPath.Application.Abstractions.AI;
 
 public sealed record GeneratedSkill
@@ -13,6 +15,6 @@ public interface ISkillTreeGenerator
     Task<IReadOnlyCollection<GeneratedSkill>> GenerateAsync(
         string goalTitle,
         string goalDescription,
-        IReadOnlyCollection<string> existingSkillNames,
+        GenerateSkillTreeCommand parameters,
         CancellationToken cancellationToken);
 }

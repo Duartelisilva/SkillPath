@@ -273,4 +273,11 @@
           </app-button>
         </div>
       </app-modal>
+
+      <!-- Generation Settings Modal -->
+        <app-generation-settings-modal
+          [isOpen]="showSettingsModal()"
+          (closed)="showSettingsModal.set(false)"
+          (generate)="generateTreeWithSettings($event)"
+        />
     </div>

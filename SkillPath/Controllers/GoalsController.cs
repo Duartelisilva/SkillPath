@@ -91,7 +91,16 @@ public sealed class GoalsController : ControllerBase
         var command = new GenerateSkillTreeCommand
         {
             GoalId = id,
-            AdditionalContext = request.AdditionalContext
+            AdditionalContext = request.AdditionalContext,
+            MinSkills = request.MinSkills ?? 5,
+            MaxSkills = request.MaxSkills ?? 12,
+            TasksPerSkill = request.TasksPerSkill ?? 5,
+            Difficulty = Enum.TryParse<DifficultyLevel>(request.Difficulty, out var diff)
+                ? diff
+                : DifficultyLevel.Intermediate,
+            Focus = Enum.TryParse<TreeFocus>(request.Focus, out var focus)
+                ? focus
+                : TreeFocus.Balanced
         };
 
         var result = await handler.HandleAsync(command, cancellationToken);

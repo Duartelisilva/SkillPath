@@ -1,0 +1,186 @@
+<app-modal
+    [isOpen]="isOpen"
+    size="lg"
+    [hasFooter]="true"
+    (closed)="onCancel()"
+>
+    <h2 modal-header>Customize Skill Tree Generation</h2>
+
+    <div class="settings-grid">
+    <!-- Difficulty -->
+    <div class="setting-group">
+        <label class="setting-label">
+        <span class="label-text">Difficulty Level</span>
+        <span class="label-hint">Affects task complexity and XP requirements</span>
+        </label>
+        <div class="difficulty-options">
+        <button
+            type="button"
+            class="difficulty-btn"
+            [class.active]="settings().difficulty === 'Beginner'"
+            (click)="setDifficulty('Beginner')"
+        >
+            <span class="difficulty-icon">🌱</span>
+            <div class="difficulty-info">
+            <strong>Beginner</strong>
+            <small>Simple tasks • 50-100 XP</small>
+            </div>
+        </button>
+        <button
+            type="button"
+            class="difficulty-btn"
+            [class.active]="settings().difficulty === 'Intermediate'"
+            (click)="setDifficulty('Intermediate')"
+        >
+            <span class="difficulty-icon">⚡</span>
+            <div class="difficulty-info">
+            <strong>Intermediate</strong>
+            <small>Moderate tasks • 100-200 XP</small>
+            </div>
+        </button>
+        <button
+            type="button"
+            class="difficulty-btn"
+            [class.active]="settings().difficulty === 'Advanced'"
+            (click)="setDifficulty('Advanced')"
+        >
+            <span class="difficulty-icon">🚀</span>
+            <div class="difficulty-info">
+            <strong>Advanced</strong>
+            <small>Complex projects • 200-500 XP</small>
+            </div>
+        </button>
+        </div>
+    </div>
+
+    <!-- Tree Focus -->
+    <div class="setting-group">
+        <label class="setting-label">
+        <span class="label-text">Tree Structure</span>
+        <span class="label-hint">How skills are organized</span>
+        </label>
+        <div class="focus-options">
+        <button
+            type="button"
+            class="focus-btn"
+            [class.active]="settings().focus === 'Breadth'"
+            (click)="setFocus('Breadth')"
+        >
+            <span class="focus-icon">🌐</span>
+            <div class="focus-info">
+            <strong>Breadth</strong>
+            <small>More skills, less dependencies</small>
+            </div>
+        </button>
+        <button
+            type="button"
+            class="focus-btn"
+            [class.active]="settings().focus === 'Balanced'"
+            (click)="setFocus('Balanced')"
+        >
+            <span class="focus-icon">⚖️</span>
+            <div class="focus-info">
+            <strong>Balanced</strong>
+            <small>Mix of parallel & sequential</small>
+            </div>
+        </button>
+        <button
+            type="button"
+            class="focus-btn"
+            [class.active]="settings().focus === 'Depth'"
+            (click)="setFocus('Depth')"
+        >
+            <span class="focus-icon">🎯</span>
+            <div class="focus-info">
+            <strong>Depth</strong>
+            <small>Fewer skills, deep mastery</small>
+            </div>
+        </button>
+        </div>
+    </div>
+
+    <!-- Skill Count -->
+    <div class="setting-group">
+        <label class="setting-label">
+        <span class="label-text">Number of Skills</span>
+        <span class="label-hint">{{ settings().minSkills }} - {{ settings().maxSkills }} skills</span>
+        </label>
+        <div class="range-group">
+        <input
+            type="range"
+            [min]="3"
+            [max]="20"
+            [(ngModel)]="minSkills"
+            (ngModelChange)="updateSkillRange()"
+            class="range-input"
+        />
+        <div class="range-values">
+            <span>Min: {{ settings().minSkills }}</span>
+            <span>Max: {{ settings().maxSkills }}</span>
+        </div>
+        </div>
+    </div>
+
+    <!-- Tasks Per Skill -->
+    <div class="setting-group">
+        <label class="setting-label">
+        <span class="label-text">Tasks Per Skill</span>
+        <span class="label-hint">{{ settings().tasksPerSkill }} tasks per skill</span>
+        </label>
+        <div class="task-count-options">
+        @for (count of [3, 5, 7, 10]; track count) {
+            <button
+            type="button"
+            class="count-btn"
+            [class.active]="settings().tasksPerSkill === count"
+            (click)="setTaskCount(count)"
+            >
+            {{ count }}
+            </button>
+        }
+        </div>
+    </div>
+
+    <!-- Additional Context -->
+    <div class="setting-group full-width">
+        <label class="setting-label">
+        <span class="label-text">Additional Context (Optional)</span>
+        <span class="label-hint">Guide the AI with specific requirements or preferences</span>
+        </label>
+        <textarea
+        [(ngModel)]="additionalContext"
+        placeholder="E.g., Focus on practical projects, include mobile development, avoid theory-heavy topics..."
+        rows="3"
+        class="context-input"
+        ></textarea>
+    </div>
+
+    <!-- Preview Summary -->
+    <div class="setting-group full-width">
+        <div class="preview-summary">
+        <h4>Generation Preview</h4>
+        <div class="preview-badges">
+            <app-badge variant="info">{{ settings().difficulty }}</app-badge>
+            <app-badge variant="success">{{ settings().focus }} Focus</app-badge>
+            <app-badge variant="active">{{ settings().minSkills }}-{{ settings().maxSkills }} Skills</app-badge>
+            <app-badge variant="in-progress">{{ settings().tasksPerSkill }} Tasks Each</app-badge>
+        </div>
+        <p class="preview-description">
+            {{ getPreviewDescription() }}
+        </p>
+        </div>
+    </div>
+    </div>
+
+    <div modal-footer class="modal-actions">
+    <app-button variant="secondary" (clicked)="onCancel()">
+        Cancel
+    </app-button>
+    <app-button variant="ghost" (clicked)="resetToDefaults()">
+        Reset Defaults
+    </app-button>
+    <app-button variant="primary" (clicked)="onGenerate()">
+        🤖 Generate Skill Tree
+    </app-button>
+    </div>
+</app-modal>

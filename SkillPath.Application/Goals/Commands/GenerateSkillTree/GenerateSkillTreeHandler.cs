@@ -66,7 +66,7 @@ public sealed class GenerateSkillTreeHandler
         var generatedSkills = await _skillGenerator.GenerateAsync(
             goalTitle,
             goal.Description,
-            Array.Empty<string>(),
+            command, 
             cancellationToken);
 
         _logger.LogInformation("AI generated {Count} skills", generatedSkills.Count);

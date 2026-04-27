@@ -6,6 +6,7 @@ import { FormsModule } from '@angular/forms';
 import { ErrorHandlerService } from '../../services/error-handler.service';
 import { ApiService } from '../../services/api.service';
 import { Goal } from '../../models/goal.model';
+import { GenerationSettingsModal, GenerationSettings } from '../../shared/components/generation-settings-modal/generation-settings-modal';
 
 // Import new components
 import { ButtonComponent } from '../../shared/components/button/button';
@@ -26,7 +27,8 @@ import { ProgressBarComponent } from '../../shared/components/progress-bar/progr
     BadgeComponent,
     ModalComponent,
     SpinnerComponent,
-    ProgressBarComponent
+    ProgressBarComponent,
+    GenerationSettingsModal
   ],
   templateUrl: './goals.html',
   styleUrls: ['./goals.scss']
@@ -43,6 +45,8 @@ export class GoalsComponent implements OnInit, OnDestroy {
   errorMessage = signal('');
   newTitle = '';
   newDescription = '';
+  showSettingsModal = signal(false);
+  pendingGoalId = signal<string | null>(null);
 
   private api = inject(ApiService);
   private router = inject(Router);
@@ -122,7 +126,8 @@ export class GoalsComponent implements OnInit, OnDestroy {
 
   handleGenerateClick(event: Event, goal: Goal) {
     event.stopPropagation();
-    this.generateTree(goal);
+    this.pendingGoalId.set(goal.id);
+    this.showSettingsModal.set(true); // Open settings modal instead
   }
 
   generateTree(goal: Goal) {
@@ -276,5 +281,43 @@ export class GoalsComponent implements OnInit, OnDestroy {
     }
     
     return true;
+  }
+
+  generateTreeWithSettings(settings: GenerationSettings) {
+    const goalId = this.pendingGoalId();
+    if (!goalId) return;
+
+    const goal = this.goals().find(g => g.id === goalId);
+    if (!goal) return;
+
+    this.showSettingsModal.set(false);
+    this.generating.set(goalId);
+    
+    this.generationStates.set(goalId, {
+      status: 'generating',
+      progress: 0
+    });
+    
+    this.progressTitle.set('Generating Skill Tree');
+    this.startProgressSimulation(goalId);
+
+    this.api.generateSkillTree(goalId, settings) // Pass settings
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.stopProgressSimulation();
+          this.generating.set(null);
+          this.generationStates.set(goalId, { status: 'success', progress: 100 });
+          this.loadGoals();
+          this.pendingGoalId.set(null);
+        },
+        error: (err) => {
+          this.stopProgressSimulation();
+          this.generating.set(null);
+          this.generationStates.set(goalId, { status: 'failed', progress: 0 });
+          this.handleGenerationError(err);
+          this.pendingGoalId.set(null);
+        }
+      });
   }
 }
