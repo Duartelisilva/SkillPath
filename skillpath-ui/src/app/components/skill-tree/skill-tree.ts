@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, DestroyRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, ElementRef, ViewChild, DestroyRef, effect } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -8,6 +8,10 @@ import { Goal } from '../../models/goal.model';
 import { Skill } from '../../models/skill.model';
 import { LearningTask } from '../../models/task.model';
 import cytoscape from 'cytoscape';
+// @ts-ignore
+import dagre from 'cytoscape-dagre';
+// @ts-ignore
+import coseBilkent from 'cytoscape-cose-bilkent';
 
 // Import components
 import { ButtonComponent } from '../../shared/components/button/button';
@@ -16,6 +20,12 @@ import { BadgeVariant } from '../../shared/components/badge/badge';
 import { ProgressBarComponent } from '../../shared/components/progress-bar/progress-bar';
 import { SpinnerComponent } from '../../shared/components/spinner/spinner';
 import { ModalComponent } from '../../shared/components/modal/modal';
+
+// Register layout extensions
+cytoscape.use(dagre);
+cytoscape.use(coseBilkent);
+
+type LayoutType = 'breadthfirst' | 'dagre' | 'cose-bilkent' | 'grid' | 'circle';
 
 @Component({
   selector: 'app-skill-tree',
@@ -48,10 +58,30 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
   tasksLoading = signal(false);
   regeneratingTasks = signal(false);
   showRegenerateModal = signal(false);
+  
+  // Layout controls
+  currentLayout = signal<LayoutType>('breadthfirst');
+  showLayoutMenu = signal(false);
+  showMinimap = signal(false);
+  
+  // Hover tooltip
+  tooltipVisible = signal(false);
+  tooltipContent = signal<{
+    skillName: string;
+    status: string;
+    earnedXP: number;
+    requiredXP: number;
+    taskCount: number;
+    completedTasks: number;
+    dependencies: string[];
+  } | null>(null);
+  tooltipX = signal(0);
+  tooltipY = signal(0);
 
   private cy: cytoscape.Core | null = null;
   private goalId = '';
   private allSkills: Skill[] = [];
+  private layoutAnimating = false;
 
   ngOnInit() {
     this.goalId = this.route.snapshot.paramMap.get('goalId') ?? '';
@@ -63,20 +93,16 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
   }
 
   loadGoalAndSkillTree() {
-    // Load goal first
     this.api.getGoals()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-
         next: (goals) => {
           const goal = goals.find(g => g.id === this.goalId);
           this.currentGoal.set(goal || null);
-          
-          // Then load skills
           this.loadSkillTree();
         },
         error: () => {
-          this.loadSkillTree(); // Continue even if goal fetch fails
+          this.loadSkillTree();
         }
     });
   }
@@ -109,6 +135,42 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     if (this.cy) {
       this.cy.fit(undefined, 50);
     }
+  }
+
+  changeLayout(layout: LayoutType) {
+    if (this.layoutAnimating || !this.cy) return;
+    
+    this.layoutAnimating = true;
+    this.currentLayout.set(layout);
+    this.showLayoutMenu.set(false);
+
+    const layoutConfig = this.getLayoutConfig(layout);
+    const cyLayout = this.cy.layout(layoutConfig);
+    
+    cyLayout.run();
+    
+    setTimeout(() => {
+      this.layoutAnimating = false;
+    }, 1000);
+  }
+
+  toggleMinimap() {
+    this.showMinimap.update(v => !v);
+  }
+
+  exportAsPNG() {
+    if (!this.cy) return;
+    
+    const png = this.cy.png({
+      full: true,
+      scale: 2,
+      bg: '#0a0e1a'
+    });
+
+    const link = document.createElement('a');
+    link.download = `${this.currentGoal()?.title || 'skill-tree'}.png`;
+    link.href = png;
+    link.click();
   }
 
   getStatusBadgeVariant(status: string): BadgeVariant {
@@ -151,6 +213,56 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     return true;
   }
 
+  private getLayoutConfig(layout: LayoutType): any {
+    const configs: Record<LayoutType, any> = {
+      breadthfirst: {
+        name: 'breadthfirst',
+        directed: true,
+        padding: 80,
+        spacingFactor: 1.2,
+        avoidOverlap: true,
+        animate: true,
+        animationDuration: 500,
+        animationEasing: 'ease-out'
+      },
+      dagre: {
+        name: 'dagre',
+        rankDir: 'TB',
+        nodeSep: 80,
+        rankSep: 120,
+        animate: true,
+        animationDuration: 500,
+        animationEasing: 'ease-out'
+      },
+      'cose-bilkent': {
+        name: 'cose-bilkent',
+        idealEdgeLength: 150,
+        nodeRepulsion: 8000,
+        animate: true,
+        animationDuration: 1000,
+        animationEasing: 'ease-out',
+        randomize: false
+      },
+      grid: {
+        name: 'grid',
+        rows: 3,
+        padding: 80,
+        animate: true,
+        animationDuration: 500,
+        animationEasing: 'ease-out'
+      },
+      circle: {
+        name: 'circle',
+        padding: 80,
+        animate: true,
+        animationDuration: 500,
+        animationEasing: 'ease-out'
+      }
+    };
+
+    return configs[layout];
+  }
+
   initCytoscape(skills: Skill[]) {
     if (this.cy) {
       this.cy.destroy();
@@ -178,7 +290,13 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     const edges: any[] = [];
     skills.forEach(s => {
       (s.dependsOn ?? []).forEach((depId: string) => {
-        edges.push({ data: { source: depId, target: s.id } });
+        edges.push({ 
+          data: { 
+            source: depId, 
+            target: s.id,
+            id: `${depId}-${s.id}`
+          } 
+        });
       });
     });
 
@@ -206,6 +324,8 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
             'border-color': (ele: any) => statusColors[ele.data('status')] ?? '#374151',
             'border-opacity': 0.9,
             'padding': '12px',
+            'transition-property': 'background-color, border-color, border-width',
+            'transition-duration': '0.3s'
           } as any
         },
         {
@@ -217,6 +337,14 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
           } as any
         },
         {
+          selector: 'node.highlighted',
+          style: {
+            'border-color': '#06b6d4',
+            'border-width': 4,
+            'box-shadow': '0 0 15px rgba(6,182,212,0.6)',
+          } as any
+        },
+        {
           selector: 'edge',
           style: {
             'width': 3,
@@ -225,38 +353,121 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
             'arrow-scale': 1.5,
+            'transition-property': 'line-color, width',
+            'transition-duration': '0.3s'
+          } as any
+        },
+        {
+          selector: 'edge.highlighted',
+          style: {
+            'line-color': '#06b6d4',
+            'target-arrow-color': '#06b6d4',
+            'width': 4,
           } as any
         }
       ],
-      layout: {
-        name: 'breadthfirst',
-        directed: true,
-        padding: 80,
-        spacingFactor: 1,
-        avoidOverlap: true,
-      },
+      layout: this.getLayoutConfig(this.currentLayout()),
       minZoom: 0.3,
-      maxZoom: 2.0,
-      wheelSensitivity: 3,
+      maxZoom: 2.5,
+      wheelSensitivity: 0.2,
       userZoomingEnabled: true,
       userPanningEnabled: true,
       autoungrabify: true,
       boxSelectionEnabled: false,
     });
 
-    this.cy.fit(undefined, 50);
+    this.setupInteractions();
+  }
 
+  private setupInteractions() {
+    if (!this.cy) return;
+
+    // Click to select skill
     this.cy.on('tap', 'node', (evt: any) => {
       const skill: Skill = evt.target.data('skill');
       this.selectedSkill.set(skill);
       this.loadTasks(skill);
+      this.highlightDependencies(evt.target);
     });
 
+    // Click background to deselect
     this.cy.on('tap', (evt: any) => {
       if (evt.target === this.cy) {
         this.closePanel();
+        this.clearHighlights();
       }
     });
+
+    // Hover tooltip
+    this.cy.on('mouseover', 'node', (evt: any) => {
+      const skill: Skill = evt.target.data('skill');
+      this.showTooltip(evt, skill);
+    });
+
+    this.cy.on('mouseout', 'node', () => {
+      this.hideTooltip();
+    });
+  }
+
+  private highlightDependencies(node: any) {
+    if (!this.cy) return;
+
+    this.clearHighlights();
+
+    // Highlight all dependencies (predecessors)
+    const predecessors = node.predecessors();
+    predecessors.addClass('highlighted');
+
+    // Highlight all dependents (successors)
+    const successors = node.successors();
+    successors.addClass('highlighted');
+  }
+
+  private clearHighlights() {
+    if (!this.cy) return;
+    this.cy.elements().removeClass('highlighted');
+  }
+
+  private showTooltip(evt: any, skill: Skill) {
+    const renderedPosition = evt.target.renderedPosition();
+    
+    // Get task info
+    const taskInfo = this.getTaskInfo(skill.id);
+    
+    // Get dependency names
+    const dependencyNames = skill.dependsOn
+      .map(depId => this.allSkills.find(s => s.id === depId)?.name)
+      .filter(Boolean) as string[];
+
+    this.tooltipContent.set({
+      skillName: skill.name,
+      status: skill.status,
+      earnedXP: taskInfo.earnedXP,
+      requiredXP: skill.requiredExperiencePoints,
+      taskCount: taskInfo.totalTasks,
+      completedTasks: taskInfo.completedTasks,
+      dependencies: dependencyNames
+    });
+
+    this.tooltipX.set(renderedPosition.x + 100);
+    this.tooltipY.set(renderedPosition.y - 50);
+    this.tooltipVisible.set(true);
+  }
+
+  private hideTooltip() {
+    this.tooltipVisible.set(false);
+  }
+
+  private getTaskInfo(skillId: string): { earnedXP: number; totalTasks: number; completedTasks: number } {
+    const skill = this.allSkills.find(s => s.id === skillId);
+    if (!skill) return { earnedXP: 0, totalTasks: 0, completedTasks: 0 };
+
+    // This is a simplified version - in real implementation you'd fetch actual task data
+    return {
+      earnedXP: 0,
+      totalTasks: 0,
+      completedTasks: 0
+    };
   }
 
   loadTasks(skill: Skill) {

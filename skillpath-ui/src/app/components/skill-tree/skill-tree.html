@@ -1,161 +1,261 @@
 <div class="skill-tree-page">
-    <!-- Breadcrumb Navigation (NEW!) -->
-    <nav class="breadcrumb" *ngIf="!loading()">
+  <!-- Breadcrumb Navigation -->
+  <nav class="breadcrumb" *ngIf="!loading()">
     <a routerLink="/goals" class="breadcrumb-link">
-        <span class="breadcrumb-icon">🏠</span>
-        Goals
+      <span class="breadcrumb-icon">🏠</span>
+      Goals
     </a>
     <span class="breadcrumb-separator">›</span>
     <span class="breadcrumb-current">{{ currentGoal()?.title || 'Skill Tree' }}</span>
-    </nav>
+  </nav>
 
-    <!-- Goal Header (NEW!) -->
-    <header class="goal-header" *ngIf="!loading() && currentGoal()">
+  <!-- Goal Header with Layout Controls -->
+  <header class="goal-header" *ngIf="!loading() && currentGoal()">
     <div class="goal-header-content">
-        <div class="goal-header-main">
+      <div class="goal-header-main">
         <h1 class="goal-header-title">{{ currentGoal()!.title }}</h1>
-            <app-badge [variant]="getStatusBadgeVariant(currentGoal()!.status)">
-            {{ currentGoal()!.status }}
+        <app-badge [variant]="getStatusBadgeVariant(currentGoal()!.status)">
+          {{ currentGoal()!.status }}
         </app-badge>
-        </div>
-        <p class="goal-header-description">{{ currentGoal()!.description }}</p>
+      </div>
+      <p class="goal-header-description">{{ currentGoal()!.description }}</p>
     </div>
+    
     <div class="goal-header-actions">
-        <app-button variant="secondary" size="sm" (clicked)="resetZoom()">
-        🔍 Reset View
+      <!-- Layout Selector -->
+      <div class="layout-selector">
+        <app-button 
+          variant="secondary" 
+          size="sm" 
+          (clicked)="showLayoutMenu.update(v => !v)"
+        >
+          📐 Layout: {{ currentLayout() }}
         </app-button>
-        <app-button variant="secondary" size="sm" (clicked)="goBack()">
-        ← Back to Goals
-        </app-button>
-    </div>
-    </header>
+        
+        <div class="layout-menu" *ngIf="showLayoutMenu()">
+          <button 
+            class="layout-option"
+            [class.active]="currentLayout() === 'breadthfirst'"
+            (click)="changeLayout('breadthfirst')"
+          >
+            <span class="layout-icon">🌳</span>
+            <span>Breadth First</span>
+          </button>
+          <button 
+            class="layout-option"
+            [class.active]="currentLayout() === 'dagre'"
+            (click)="changeLayout('dagre')"
+          >
+            <span class="layout-icon">📊</span>
+            <span>Hierarchical</span>
+          </button>
+          <button 
+            class="layout-option"
+            [class.active]="currentLayout() === 'cose-bilkent'"
+            (click)="changeLayout('cose-bilkent')"
+          >
+            <span class="layout-icon">🌀</span>
+            <span>Force Directed</span>
+          </button>
+          <button 
+            class="layout-option"
+            [class.active]="currentLayout() === 'grid'"
+            (click)="changeLayout('grid')"
+          >
+            <span class="layout-icon">⊞</span>
+            <span>Grid</span>
+          </button>
+          <button 
+            class="layout-option"
+            [class.active]="currentLayout() === 'circle'"
+            (click)="changeLayout('circle')"
+          >
+            <span class="layout-icon">⭕</span>
+            <span>Circle</span>
+          </button>
+        </div>
+      </div>
 
-    <div class="layout" *ngIf="!loading()">
+      <app-button variant="secondary" size="sm" (clicked)="exportAsPNG()">
+        📸 Export PNG
+      </app-button>
+      <app-button variant="secondary" size="sm" (clicked)="resetZoom()">
+        🔍 Reset View
+      </app-button>
+      <app-button variant="secondary" size="sm" (clicked)="goBack()">
+        ← Back
+      </app-button>
+    </div>
+  </header>
+
+  <div class="layout" *ngIf="!loading()">
     <div #cyContainer class="cy-container"></div>
 
-    <!-- Enhanced Task Panel -->
+    <!-- Hover Tooltip -->
+    <div 
+      class="skill-tooltip"
+      *ngIf="tooltipVisible() && tooltipContent()"
+      [style.left.px]="tooltipX()"
+      [style.top.px]="tooltipY()"
+    >
+      <div class="tooltip-header">
+        <strong>{{ tooltipContent()!.skillName }}</strong>
+        <app-badge 
+          [variant]="getSkillStatusBadgeVariant(tooltipContent()!.status)"
+          size="sm"
+        >
+          {{ tooltipContent()!.status }}
+        </app-badge>
+      </div>
+      
+      <div class="tooltip-body">
+        <div class="tooltip-row">
+          <span class="tooltip-label">XP Progress:</span>
+          <span class="tooltip-value">
+            {{ tooltipContent()!.earnedXP }} / {{ tooltipContent()!.requiredXP }}
+          </span>
+        </div>
+        
+        <div class="tooltip-row">
+          <span class="tooltip-label">Tasks:</span>
+          <span class="tooltip-value">
+            {{ tooltipContent()!.completedTasks }} / {{ tooltipContent()!.taskCount }} completed
+          </span>
+        </div>
+        
+        <div class="tooltip-row" *ngIf="tooltipContent()!.dependencies.length > 0">
+          <span class="tooltip-label">Dependencies:</span>
+          <span class="tooltip-value">
+            {{ tooltipContent()!.dependencies.join(', ') }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task Panel (existing code - keep as is) -->
     <div class="task-panel" [class.open]="selectedSkill() !== null">
-        <div class="panel-header" *ngIf="selectedSkill()">
+      <!-- ... existing task panel content ... -->
+      <div class="panel-header" *ngIf="selectedSkill()">
         <div class="skill-info">
-            <app-badge
+          <app-badge
             [variant]="getSkillStatusBadgeVariant(selectedSkill()!.status)"
             [showDot]="true"
             size="sm"
-            >
+          >
             {{ selectedSkill()!.status }}
-            </app-badge>
-            <h2>{{ selectedSkill()!.name }}</h2>
+          </app-badge>
+          <h2>{{ selectedSkill()!.name }}</h2>
         </div>
         <app-button
-            variant="ghost"
-            size="sm"
-            (clicked)="closePanel()"
-            class="close-btn-wrapper"
+          variant="ghost"
+          size="sm"
+          (clicked)="closePanel()"
+          class="close-btn-wrapper"
         >
-            ✕
+          ✕
         </app-button>
-        </div>
+      </div>
 
-        <p class="skill-desc" *ngIf="selectedSkill()">
+      <p class="skill-desc" *ngIf="selectedSkill()">
         {{ selectedSkill()!.description }}
-        </p>
+      </p>
 
-        <!-- XP Progress Bar (NEW!) -->
-        <div class="xp-progress-section" *ngIf="selectedSkill() && tasks().length > 0">
+      <!-- XP Progress Bar -->
+      <div class="xp-progress-section" *ngIf="selectedSkill() && tasks().length > 0">
         <app-progress-bar
-            label="Experience Points"
-            [current]="getEarnedXP()"
-            [max]="selectedSkill()!.requiredExperiencePoints || 100"
-            unit="XP"
-            variant="xp"
-            size="md"
-            [showPercentage]="true"
+          label="Experience Points"
+          [current]="getEarnedXP()"
+          [max]="selectedSkill()!.requiredExperiencePoints || 100"
+          unit="XP"
+          variant="xp"
+          size="md"
+          [showPercentage]="true"
         />
-        </div>
+      </div>
 
-        <div class="tasks-section" *ngIf="selectedSkill()">
+      <div class="tasks-section" *ngIf="selectedSkill()">
         <div class="tasks-header">
-            <h3>Tasks</h3>
-            <app-button
+          <h3>Tasks</h3>
+          <app-button
             variant="ghost"
             size="sm"
             (clicked)="showRegenerateModal.set(true)"
             [disabled]="regeneratingTasks() || selectedSkill()?.status === 'Completed'"
-            >
+          >
             {{ regeneratingTasks() ? '⚙ Regenerating...' : '🔄 Regenerate' }}
-            </app-button>
+          </app-button>
         </div>
 
         <!-- Tasks Loading -->
         <div *ngIf="tasksLoading()" class="tasks-loading">
-            <app-spinner size="sm" variant="primary" />
+          <app-spinner size="sm" variant="primary" />
         </div>
 
         <!-- Task List -->
         <div class="task-list" *ngIf="!tasksLoading()">
-            <div class="task-item {{ task.status }}" *ngFor="let task of tasks()">
+          <div class="task-item {{ task.status }}" *ngFor="let task of tasks()">
             <div
-                class="task-check"
-                (click)="toggleTaskStatus(task)"
-                [class.disabled]="!canToggleTask(task)"
+              class="task-check"
+              (click)="toggleTaskStatus(task)"
+              [class.disabled]="!canToggleTask(task)"
             >
-                <span *ngIf="task.status === 'Completed'" class="check-icon">✓</span>
-                <span *ngIf="task.status === 'InProgress'" class="progress-icon">◎</span>
-                <span *ngIf="task.status === 'NotStarted'" class="empty-icon">○</span>
+              <span *ngIf="task.status === 'Completed'" class="check-icon">✓</span>
+              <span *ngIf="task.status === 'InProgress'" class="progress-icon">◎</span>
+              <span *ngIf="task.status === 'NotStarted'" class="empty-icon">○</span>
             </div>
             <div class="task-content">
-                <div class="task-header-row">
+              <div class="task-header-row">
                 <p class="task-title">{{ task.title }}</p>
                 <app-badge
-                    [variant]="task.experiencePoints === 0 ? 'archived' : 'info'"
-                    size="sm"
+                  [variant]="task.experiencePoints === 0 ? 'archived' : 'info'"
+                  size="sm"
                 >
-                    {{ task.experiencePoints }} XP
+                  {{ task.experiencePoints }} XP
                 </app-badge>
-                </div>
-                <p class="task-desc">{{ task.description }}</p>
+              </div>
+              <p class="task-desc">{{ task.description }}</p>
             </div>
-            </div>
-            <div *ngIf="tasks().length === 0" class="no-tasks">
+          </div>
+          <div *ngIf="tasks().length === 0" class="no-tasks">
             <span class="no-tasks-icon">📝</span>
             <p>No tasks generated for this skill.</p>
-            </div>
+          </div>
         </div>
-        </div>
+      </div>
     </div>
-    </div>
+  </div>
 
-    <!-- Loading State -->
-    <div class="loading-container" *ngIf="loading()">
+  <!-- Loading State -->
+  <div class="loading-container" *ngIf="loading()">
     <app-spinner size="xl" variant="primary" text="Loading skill tree..." />
-    </div>
+  </div>
 
-    <!-- Regenerate Confirmation Modal -->
-    <app-modal
+  <!-- Regenerate Confirmation Modal -->
+  <app-modal
     [isOpen]="showRegenerateModal()"
     size="sm"
     [hasFooter]="true"
     (closed)="showRegenerateModal.set(false)"
-    >
+  >
     <h2 modal-header>Regenerate Tasks?</h2>
     <p>This will delete all existing tasks for <strong>{{ selectedSkill()?.name }}</strong> and generate new ones using AI.</p>
     <p style="color: var(--text-muted); font-size: 0.875rem; margin-top: 0.5rem;">
-        ⚠️ This action cannot be undone.
+      ⚠️ This action cannot be undone.
     </p>
 
     <div modal-footer class="modal-actions">
-        <app-button
+      <app-button
         variant="secondary"
         (clicked)="showRegenerateModal.set(false)"
-        >
+      >
         Cancel
-        </app-button>
-        <app-button
+      </app-button>
+      <app-button
         variant="primary"
         (clicked)="confirmRegenerateTasks()"
-        >
+      >
         Regenerate Tasks
-        </app-button>
+      </app-button>
     </div>
-    </app-modal>
+  </app-modal>
 </div>
