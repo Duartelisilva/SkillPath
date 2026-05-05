@@ -320,4 +320,36 @@ export class GoalsComponent implements OnInit, OnDestroy {
         }
       });
   }
+
+  // Add signals
+  showDeleteModal = signal(false);
+  goalToDelete = signal<Goal | null>(null);
+
+  // Add delete handler
+  handleDeleteClick(event: Event, goal: Goal) {
+    event.stopPropagation();
+    this.goalToDelete.set(goal);
+    this.showDeleteModal.set(true);
+  }
+
+  // Add confirm delete
+  confirmDelete() {
+    const goal = this.goalToDelete();
+    if (!goal) return;
+
+    this.api.deleteGoal(goal.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.goals.update(goals => goals.filter(g => g.id !== goal.id));
+          this.showDeleteModal.set(false);
+          this.goalToDelete.set(null);
+          this.errorHandler.success('Goal deleted successfully');
+        },
+        error: (err) => {
+          this.errorHandler.handleHttpError(err, 'Delete Goal');
+          this.showDeleteModal.set(false);
+        }
+      });
+  }
 }

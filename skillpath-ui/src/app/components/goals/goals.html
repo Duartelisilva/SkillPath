@@ -61,13 +61,23 @@
         >
           <!-- Header -->
           <div card-header class="goal-card-header">
-            <app-badge
-              [variant]="getStatusBadgeVariant(goal.status)"
-              size="sm"
+            <div class="header-left">
+              <app-badge
+                [variant]="getStatusBadgeVariant(goal.status)"
+                size="sm"
+              >
+                {{ goal.status }}
+              </app-badge>
+              <span class="skill-count">{{ getSkillCount(goal) }} skills</span>
+            </div>
+            
+            <button 
+              class="delete-goal-btn"
+              (click)="handleDeleteClick($event, goal)"
+              title="Delete goal"
             >
-              {{ goal.status }}
-            </app-badge>
-            <span class="skill-count">{{ getSkillCount(goal) }} skills</span>
+              🗑️
+            </button>
           </div>
 
           <!-- Body -->
@@ -280,4 +290,33 @@
           (closed)="showSettingsModal.set(false)"
           (generate)="generateTreeWithSettings($event)"
         />
+
+        <!-- Delete Confirmation Modal -->
+        <app-modal
+          [isOpen]="showDeleteModal()"
+          size="sm"
+          [hasFooter]="true"
+          (closed)="showDeleteModal.set(false)"
+        >
+          <h2 modal-header>Delete Goal?</h2>
+          <p>Are you sure you want to delete <strong>{{ goalToDelete()?.title }}</strong>?</p>
+          <p style="color: var(--accent-red); font-size: 0.875rem; margin-top: 0.5rem;">
+            ⚠️ This will permanently delete the goal and all its skills and tasks. This action cannot be undone.
+          </p>
+
+          <div modal-footer class="modal-actions">
+            <app-button
+              variant="secondary"
+              (clicked)="showDeleteModal.set(false)"
+            >
+              Cancel
+            </app-button>
+            <app-button
+              variant="danger"
+              (clicked)="confirmDelete()"
+            >
+              Delete Goal
+            </app-button>
+          </div>
+        </app-modal>
     </div>
