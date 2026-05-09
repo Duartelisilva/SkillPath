@@ -355,11 +355,40 @@ export class GoalsComponent implements OnInit, OnDestroy {
   // Add signal
   showStatusMenu = signal<string | null>(null);
 
-  toggleStatusMenu(goalId: string) {
+  toggleStatusMenu(goalId: string, event?: MouseEvent) {
     if (this.showStatusMenu() === goalId) {
       this.showStatusMenu.set(null);
     } else {
       this.showStatusMenu.set(goalId);
+      
+      // Position menu dynamically on next tick
+      if (event) {
+        setTimeout(() => {
+          const menu = document.querySelector('.status-menu') as HTMLElement;
+          if (menu) {
+            const rect = (event.target as HTMLElement).getBoundingClientRect();
+            const menuWidth = 160;
+            const menuHeight = menu.offsetHeight;
+            
+            // Calculate position
+            let left = rect.right - menuWidth;
+            let top = rect.bottom + 8;
+            
+            // Adjust if would overflow right edge
+            if (left < 10) {
+              left = rect.left;
+            }
+            
+            // Adjust if would overflow bottom edge
+            if (top + menuHeight > window.innerHeight - 10) {
+              top = rect.top - menuHeight - 8;
+            }
+            
+            menu.style.left = `${left}px`;
+            menu.style.top = `${top}px`;
+          }
+        }, 0);
+      }
     }
   }
 

@@ -439,16 +439,14 @@
 }
 
 .status-menu {
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  right: 0;
+  position: fixed; // Changed from absolute
   background: var(--bg-card);
   border: 1px solid var(--border-accent);
   border-radius: 8px;
   padding: 0.5rem;
   min-width: 160px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  z-index: 100;
+  z-index: 1000;
   animation: slideDown 0.2s ease;
 }
 

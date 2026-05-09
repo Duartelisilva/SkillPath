@@ -14,6 +14,7 @@ public sealed class SkillDto
     public DateTime CreatedAtUtc { get; init; }
     public DateTime? UpdatedAtUtc { get; init; }
     public IReadOnlyCollection<Guid> DependsOn { get; init; } = [];
+    public int RequiredExperiencePoints { get; init; }
 
     public static SkillDto FromEntity(Skill skill) => new()
     {
@@ -25,6 +26,7 @@ public sealed class SkillDto
         Status = skill.Status.ToString(),
         CreatedAtUtc = skill.CreatedAtUtc,
         UpdatedAtUtc = skill.UpdatedAtUtc,
-        DependsOn = skill.DependsOn
+        DependsOn = skill.DependsOn,
+        RequiredExperiencePoints = skill.RequiredExperiencePoints
     };
 }

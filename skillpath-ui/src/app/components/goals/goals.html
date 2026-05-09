@@ -79,7 +79,7 @@
                   <button 
                     class="status-menu-btn"
                     [class.active]="showStatusMenu() === goal.id"
-                    (click)="toggleStatusMenu(goal.id)"
+                    (click)="toggleStatusMenu(goal.id, $event)"
                     title="Change status"
                   >
                     ⚙️

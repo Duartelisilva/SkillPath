@@ -428,31 +428,48 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     this.cy.elements().removeClass('highlighted');
   }
 
-  private showTooltip(evt: any, skill: Skill) {
-    const renderedPosition = evt.target.renderedPosition();
-    
-    // Get task info
-    const taskInfo = this.getTaskInfo(skill.id);
-    
-    // Get dependency names
-    const dependencyNames = skill.dependsOn
-      .map(depId => this.allSkills.find(s => s.id === depId)?.name)
-      .filter(Boolean) as string[];
-
-    this.tooltipContent.set({
-      skillName: skill.name,
-      status: skill.status,
-      earnedXP: taskInfo.earnedXP,
-      requiredXP: skill.requiredExperiencePoints,
-      taskCount: taskInfo.totalTasks,
-      completedTasks: taskInfo.completedTasks,
-      dependencies: dependencyNames
-    });
-
-    this.tooltipX.set(renderedPosition.x + 100);
-    this.tooltipY.set(renderedPosition.y - 50);
-    this.tooltipVisible.set(true);
+private showTooltip(evt: any, skill: Skill) {
+  const renderedPosition = evt.target.renderedPosition();
+  
+  // Get actual task info from loaded tasks if this is the selected skill
+  let taskInfo = { earnedXP: 0, totalTasks: 0, completedTasks: 0 };
+  
+  if (this.selectedSkill()?.id === skill.id) {
+    // Use loaded tasks for selected skill
+    const currentTasks = this.tasks();
+    taskInfo = {
+      earnedXP: currentTasks
+        .filter(t => t.status === 'Completed')
+        .reduce((sum, t) => sum + t.experiencePoints, 0),
+      totalTasks: currentTasks.length,
+      completedTasks: currentTasks.filter(t => t.status === 'Completed').length
+    };
   }
+  
+  // Get dependency names
+  const dependencyNames = skill.dependsOn
+    .map(depId => this.allSkills.find(s => s.id === depId)?.name)
+    .filter(Boolean) as string[];
+ 
+  // Only show tooltip if we have dependencies OR task data
+  if (dependencyNames.length === 0 && taskInfo.totalTasks === 0) {
+    return; // Don't show tooltip if no useful info
+  }
+ 
+  this.tooltipContent.set({
+    skillName: skill.name,
+    status: skill.status,
+    earnedXP: taskInfo.earnedXP,
+    requiredXP: skill.requiredExperiencePoints,
+    taskCount: taskInfo.totalTasks,
+    completedTasks: taskInfo.completedTasks,
+    dependencies: dependencyNames
+  });
+ 
+  this.tooltipX.set(renderedPosition.x + 100);
+  this.tooltipY.set(renderedPosition.y - 50);
+  this.tooltipVisible.set(true);
+}
 
   private hideTooltip() {
     this.tooltipVisible.set(false);
@@ -510,16 +527,60 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
     .pipe(takeUntilDestroyed(this.destroyRef))
     .subscribe({
       next: updatedTask => {
+        // Update task list immediately
         this.tasks.update(tasks =>
           tasks.map(t => t.id === updatedTask.id ? updatedTask : t)
         );
 
-        setTimeout(() => {
-          this.loadSkillTree();
-        }, 300);
+        // Fetch updated skill data without recreating the graph
+        this.api.getSkillById(this.goalId, currentSkill.id)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({
+            next: (updatedSkill) => {
+              // Update skill in our local array
+              const skillIndex = this.allSkills.findIndex(s => s.id === updatedSkill.id);
+              if (skillIndex !== -1) {
+                this.allSkills[skillIndex] = updatedSkill;
+              }
+
+              // Update the visual node without recreating graph
+              if (this.cy) {
+                const node = this.cy.$(`#${updatedSkill.id}`);
+                if (node.length > 0) {
+                  // Update node data
+                  node.data('skill', updatedSkill);
+                  node.data('status', updatedSkill.status);
+                  
+                  // Update visual style
+                  const statusColors: Record<string, string> = {
+                    Locked: '#374151',
+                    Available: '#1d4ed8',
+                    InProgress: '#d97706',
+                    Completed: '#059669',
+                  };
+                  
+                  node.style({
+                    'background-color': statusColors[updatedSkill.status] ?? '#374151',
+                    'border-color': statusColors[updatedSkill.status] ?? '#374151'
+                  });
+
+                  // If skill just completed, check for unlocked dependents
+                  if (updatedSkill.status === 'Completed') {
+                    this.checkAndUnlockDependents(updatedSkill.id);
+                  }
+                }
+              }
+
+              // Update selected skill reference
+              this.selectedSkill.set(updatedSkill);
+            },
+            error: (err) => {
+              this.errorHandler.handleHttpError(err, 'Refresh Skill');
+            }
+          });
       },
       error: (err) => {
-        this.errorHandler.handleHttpError(err, 'Update Tasks');
+        this.errorHandler.handleHttpError(err, 'Update Task');
       }
     });
   }
@@ -544,6 +605,60 @@ export class SkillTreeComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.errorHandler.handleHttpError(err, 'Regenerate Tasks');
         this.regeneratingTasks.set(false);
+      }
+    });
+  }
+
+  private checkAndUnlockDependents(completedSkillId: string) {
+    if (!this.cy) return;
+
+    this.allSkills.forEach(skill => {
+      if (skill.status === 'Locked' && skill.dependsOn.includes(completedSkillId)) {
+        // Check if ALL dependencies are now completed
+        const allDepsCompleted = skill.dependsOn.every(depId => {
+          const depSkill = this.allSkills.find(s => s.id === depId);
+          return depSkill?.status === 'Completed';
+        });
+
+        if (allDepsCompleted) {
+          // Fetch updated skill from server (it should be unlocked)
+          this.api.getSkillById(this.goalId, skill.id)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+              next: (updatedSkill) => {
+                // Update local array
+                const index = this.allSkills.findIndex(s => s.id === updatedSkill.id);
+                if (index !== -1) {
+                  this.allSkills[index] = updatedSkill;
+                }
+
+                // Update visual node
+                const node = this.cy!.$(`#${updatedSkill.id}`);
+                if (node.length > 0) {
+                  node.data('skill', updatedSkill);
+                  node.data('status', updatedSkill.status);
+                  
+                  const statusColors: Record<string, string> = {
+                    Locked: '#374151',
+                    Available: '#1d4ed8',
+                    InProgress: '#d97706',
+                    Completed: '#059669',
+                  };
+                  
+                  // Animate the unlock
+                  node.animate({
+                    style: {
+                      'background-color': statusColors[updatedSkill.status],
+                      'border-color': statusColors[updatedSkill.status]
+                    }
+                  }, {
+                    duration: 500,
+                    easing: 'ease-out'
+                  });
+                }
+              }
+            });
+        }
       }
     });
   }

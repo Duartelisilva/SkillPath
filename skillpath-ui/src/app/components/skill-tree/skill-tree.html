@@ -109,22 +109,25 @@
       </div>
       
       <div class="tooltip-body">
-        <div class="tooltip-row">
+        <!-- Only show XP if tasks exist -->
+        <div class="tooltip-row" *ngIf="tooltipContent()!.taskCount > 0">
           <span class="tooltip-label">XP Progress:</span>
           <span class="tooltip-value">
             {{ tooltipContent()!.earnedXP }} / {{ tooltipContent()!.requiredXP }}
           </span>
         </div>
         
-        <div class="tooltip-row">
+        <!-- Only show tasks if they exist -->
+        <div class="tooltip-row" *ngIf="tooltipContent()!.taskCount > 0">
           <span class="tooltip-label">Tasks:</span>
           <span class="tooltip-value">
             {{ tooltipContent()!.completedTasks }} / {{ tooltipContent()!.taskCount }} completed
           </span>
         </div>
         
+        <!-- Only show dependencies if they exist -->
         <div class="tooltip-row" *ngIf="tooltipContent()!.dependencies.length > 0">
-          <span class="tooltip-label">Dependencies:</span>
+          <span class="tooltip-label">Depends on:</span>
           <span class="tooltip-value">
             {{ tooltipContent()!.dependencies.join(', ') }}
           </span>
