@@ -5,6 +5,7 @@ using SkillPath.Application.Skills.Dtos;
 using SkillPath.Domain.Entities;
 using SkillPath.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
+using SkillPath.Domain.Enums;
 
 namespace SkillPath.Application.Goals.Commands.GenerateSkillTree;
 
@@ -37,42 +38,60 @@ public sealed class GenerateSkillTreeHandler
     }
 
     public async Task<IReadOnlyCollection<SkillDto>> HandleAsync(
-        GenerateSkillTreeCommand command,
-        CancellationToken cancellationToken)
+       GenerateSkillTreeCommand command,
+       CancellationToken cancellationToken)
     {
         var goal = await _goalRepository.GetByIdAsync(command.GoalId, cancellationToken);
 
         if (goal is null)
             throw new DomainException("Goal not found.");
 
+        // Prevent regeneration for completed or archived goals
+        if (goal.Status == GoalStatus.Completed)
+            throw new DomainException("Cannot regenerate skills for a completed goal. Please reactivate it first.");
+
+        if (goal.Status == GoalStatus.Archived)
+            throw new DomainException("Cannot regenerate skills for an archived goal. Please reactivate it first.");
+
         _logger.LogInformation("Starting skill tree generation for goal {GoalId}: {GoalTitle}", goal.Id, goal.Title);
 
         // Delete existing skills (tasks cascade via DB)
         var existingSkills = await _skillRepository.ListByGoalAsync(goal.Id, cancellationToken);
-        _logger.LogInformation("Deleting {Count} existing skills", existingSkills.Count);
 
-        foreach (var existing in existingSkills)
-            await _skillRepository.DeleteAsync(existing, cancellationToken);
+        if (existingSkills.Count > 0)
+        {
+            _logger.LogInformation("Regenerating skills - deleting {Count} existing skills and their tasks", existingSkills.Count);
 
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+            foreach (var existing in existingSkills)
+                await _skillRepository.DeleteAsync(existing, cancellationToken);
+
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            // Reset goal to Active state (in case it was InProgress or about to complete)
+            if (goal.Status != GoalStatus.Draft && goal.Status != GoalStatus.Active)
+            {
+                goal.Activate();
+                _logger.LogInformation("Reset goal {GoalId} to Active status due to regeneration", goal.Id);
+            }
+        }
 
         // Build context
         var goalTitle = command.AdditionalContext is null
             ? goal.Title
             : $"{goal.Title}. Additional context: {command.AdditionalContext}";
 
-        // Generate skills
+        // Generate skills with parameters
         _logger.LogInformation("Requesting AI to generate skills for: {GoalTitle}", goalTitle);
         var generatedSkills = await _skillGenerator.GenerateAsync(
             goalTitle,
             goal.Description,
-            command, 
+            command, // Pass entire command with difficulty/focus/range params
             cancellationToken);
 
         _logger.LogInformation("AI generated {Count} skills", generatedSkills.Count);
 
         // First pass: Create all skills
-        var skillMap = new Dictionary<int, Skill>(); // order -> skill
+        var skillMap = new Dictionary<int, Skill>();
         var newSkills = new List<Skill>();
 
         foreach (var gen in generatedSkills)
@@ -143,6 +162,13 @@ public sealed class GenerateSkillTreeHandler
         {
             newSkills[0].Unlock();
             _logger.LogInformation("Unlocked first skill: {SkillName}", newSkills[0].Name);
+        }
+
+        // Auto-activate goal if it's still in Draft state
+        if (goal.Status == GoalStatus.Draft)
+        {
+            goal.Activate();
+            _logger.LogInformation("Activated goal {GoalId} after skill generation", goal.Id);
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);

@@ -68,9 +68,41 @@
               >
                 {{ goal.status }}
               </app-badge>
+
               <span class="skill-count">{{ getSkillCount(goal) }} skills</span>
             </div>
             
+            </div>
+              <div class="header-actions">
+                <!-- Status Menu -->
+                <div class="goal-status-control" (click)="$event.stopPropagation()">
+                  <button 
+                    class="status-menu-btn"
+                    [class.active]="showStatusMenu() === goal.id"
+                    (click)="toggleStatusMenu(goal.id)"
+                    title="Change status"
+                  >
+                    ⚙️
+                  </button>
+                  
+                  <div class="status-menu" *ngIf="showStatusMenu() === goal.id">
+                    <button 
+                      class="status-option"
+                      *ngIf="goal.status === 'Archived'"
+                      (click)="changeGoalStatus(goal, 'Active')"
+                    >
+                      ▶️ Reactivates
+                    </button>
+                    <button 
+                      class="status-option"
+                      *ngIf="goal.status === 'Active' || goal.status === 'Completed'"
+                      (click)="changeGoalStatus(goal, 'Archived')"
+                    >
+                      📦 Archives
+                    </button>
+                  </div>
+                </div>
+
             <button 
               class="delete-goal-btn"
               (click)="handleDeleteClick($event, goal)"
@@ -147,6 +179,7 @@
             </app-button>
           </div>
         </app-card>
+
 
         <!-- Empty State -->
         <app-card *ngIf="goals().length === 0" class="empty-card">

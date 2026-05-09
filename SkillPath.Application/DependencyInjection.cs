@@ -1,5 +1,7 @@
 ﻿// Registers application handlers and use case services.
 using Microsoft.Extensions.DependencyInjection;
+using SkillPath.Application.Goals.Commands.ActivateGoal;
+using SkillPath.Application.Goals.Commands.ArchiveGoal;
 using SkillPath.Application.Goals.Commands.CreateGoal;
 using SkillPath.Application.Goals.Commands.DeleteGoal;
 using SkillPath.Application.Goals.Commands.GenerateSkillTree;
@@ -32,7 +34,8 @@ public static class DependencyInjection
         services.AddScoped<GetGoalByIdHandler>();
         services.AddScoped<ListGoalsHandler>();
         services.AddScoped<GenerateSkillTreeHandler>();
-
+        services.AddScoped<ActivateGoalHandler>();
+        services.AddScoped<ArchiveGoalHandler>();
         // Skills
         services.AddScoped<CreateSkillHandler>();
         services.AddScoped<UpdateSkillHandler>();

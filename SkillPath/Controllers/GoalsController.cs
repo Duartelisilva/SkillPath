@@ -1,6 +1,8 @@
 ﻿// Exposes HTTP endpoints to manage learning goals.
 using Microsoft.AspNetCore.Mvc;
 using SkillPath.API.Contracts.Goals;
+using SkillPath.Application.Goals.Commands.ActivateGoal;
+using SkillPath.Application.Goals.Commands.ArchiveGoal;
 using SkillPath.Application.Goals.Commands.CreateGoal;
 using SkillPath.Application.Goals.Commands.DeleteGoal;
 using SkillPath.Application.Goals.Commands.GenerateSkillTree;
@@ -105,5 +107,25 @@ public sealed class GoalsController : ControllerBase
 
         var result = await handler.HandleAsync(command, cancellationToken);
         return Ok(result);
+    }
+
+    [HttpPatch("{id:guid}/activate")]
+    public async Task<IActionResult> Activate(
+    Guid id,
+    [FromServices] ActivateGoalHandler handler,
+    CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ActivateGoalCommand { Id = id }, cancellationToken);
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    [HttpPatch("{id:guid}/archive")]
+    public async Task<IActionResult> Archive(
+        Guid id,
+        [FromServices] ArchiveGoalHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ArchiveGoalCommand { Id = id }, cancellationToken);
+        return result is null ? NotFound() : Ok(result);
     }
 }

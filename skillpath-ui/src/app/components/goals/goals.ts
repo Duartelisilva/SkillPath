@@ -352,4 +352,47 @@ export class GoalsComponent implements OnInit, OnDestroy {
         }
       });
   }
+  // Add signal
+  showStatusMenu = signal<string | null>(null);
+
+  toggleStatusMenu(goalId: string) {
+    if (this.showStatusMenu() === goalId) {
+      this.showStatusMenu.set(null);
+    } else {
+      this.showStatusMenu.set(goalId);
+    }
+  }
+
+  changeGoalStatus(goal: Goal, newStatus: string) {
+    this.showStatusMenu.set(null);
+    
+    // Prevent no-op changes
+    if (goal.status === newStatus) return;
+
+    // Map frontend status to backend action
+    let endpoint: 'activate' | 'archive';
+    if (newStatus === 'Active') {
+      endpoint = 'activate';
+    } else if (newStatus === 'Archived') {
+      endpoint = 'archive';
+    } else {
+      return; // Invalid status
+    }
+
+    this.api.updateGoalStatus(goal.id, endpoint)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updatedGoal) => {
+          this.goals.update(goals =>
+            goals.map(g => g.id === updatedGoal.id ? updatedGoal : g)
+          );
+          
+          const statusText = newStatus === 'Active' ? 'reactivated' : 'archived';
+          this.errorHandler.success(`Goal ${statusText} successfully`);
+        },
+        error: (err) => {
+          this.errorHandler.handleHttpError(err, 'Update Goal Status');
+        }
+      });
+  }
 }

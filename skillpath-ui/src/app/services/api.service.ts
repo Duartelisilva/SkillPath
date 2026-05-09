@@ -93,6 +93,13 @@ export class ApiService {
     );
   }
 
+  updateGoalStatus(goalId: string, action: 'activate' | 'archive'): Observable<Goal> {
+    return this.http.patch<Goal>(
+      `${this.baseUrl}/goals/${goalId}/${action}`,
+      {}
+    );
+  }
+
   regenerateTasksForSkill(goalId: string, skillId: string): Observable<LearningTask[]> {
     // Custom header to handle errors in component
     const headers = new HttpHeaders().set('X-Skip-Error-Interceptor', 'true');
