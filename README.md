@@ -7,8 +7,6 @@
 ![Angular](https://img.shields.io/badge/Angular-21-red.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)
 
-[Features](##features) • [Tech Stack](##tech-stack) • [Screenshots](##screenshots)
-
 ---
 
 ## 📋 Overview
