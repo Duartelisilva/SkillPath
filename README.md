@@ -1,7 +1,3 @@
-To be finished
-
-
-[README.md](https://github.com/user-attachments/files/27455198/README.md)
 # SkillPath 🎯
 
 > AI-powered learning goal tracker that generates personalized skill trees and tracks your progress with gamified task management.
@@ -55,11 +51,9 @@ SkillPath is a full-stack learning management application that uses AI to break 
 
 ### 🎨 UI/UX Features
 - Custom component library (Buttons, Cards, Badges, Modals, Progress Bars, Spinners)
-- Toast notifications for user feedback
 - Centralized error handling with user-friendly messages
 - Loading states and progress indicators
-- Responsive design (desktop and mobile)
-- Dark theme with gradient accents
+- Responsive design
 
 ---
 
@@ -93,27 +87,22 @@ SkillPath is a full-stack learning management application that uses AI to break 
 
 ### Goals Dashboard
 ![Goals Dashboard](docs/screenshots/goals-dashboard.png)
-*Main dashboard showing learning goals with skill counts and generation status*
+
 
 ### AI Generation Settings
-![Generation Settings](docs/screenshots/generation-settings.png)
-*Customize difficulty, tree structure, and skill count before generation*
+![Generation Settings](docs/screenshots/generation-settings1.png)
+![Generation Settings](docs/screenshots/generation-settings2.png)
 
-### Skill Tree - Hierarchical Layout
-![Skill Tree Hierarchical](docs/screenshots/skill-tree-hierarchical.png)
-*Interactive skill tree with hierarchical layout showing dependencies*
 
-### Skill Tree - Force Directed Layout
-![Skill Tree Force](docs/screenshots/skill-tree-force.png)
-*Physics-based force-directed layout for exploring skill relationships*
+### Skill Tree - Layout
+![Skill Tree Hierarchical](docs/screenshots/skill-tree-layout.png)
+
 
 ### Task Management Panel
 ![Task Panel](docs/screenshots/task-panel.png)
-*Task tracking with XP progress and regeneration options*
 
 ### Hover Tooltips
 ![Tooltip](docs/screenshots/tooltip.png)
-*Contextual information on hover showing XP, tasks, and dependencies*
 
 ---
 
@@ -319,10 +308,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👨‍💻 Author
 
-**Duarte [Your Last Name]**
-- GitHub: [@yourusername](https://github.com/yourusername)
-- LinkedIn: [Your LinkedIn](https://linkedin.com/in/yourprofile)
-- Portfolio: [yourportfolio.com](https://yourportfolio.com)
+**Duarte Silva**
+- GitHub: [@Duartelisilva](https://github.com/Duartelisilva)
+- LinkedIn: [DuarteSilva](https://linkedin.com/in/duartesilva-)
 
 ---
 
