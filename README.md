@@ -177,7 +177,7 @@ SkillPath/
 ├── SkillPath.Infrastructure/   # Data Access, AI Integration
 │   ├── Persistence/            # EF Core, Repositories
 │   └── AI/                     # OllamaSkillTreeGenerator
-└── SkillPath.API/              # Controllers, Middleware
+└── SkillPath/                  # API Layer (Web API project)
     ├── Controllers/            # GoalsController, SkillsController
     └── Middleware/             # ExceptionHandlingMiddleware
 ```
